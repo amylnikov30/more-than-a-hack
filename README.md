@@ -1,1 +1,3 @@
-# more-than-a-hack
+# more-than-a-hack 
+
+Week 1
