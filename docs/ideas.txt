@@ -1,0 +1,7 @@
+- gaussian hidden markov model with hidden labels to determine with each frame as a state (is this too obvious?)
+    - could potentially have some complex emissions such as some sort of average positions of teams/players
+    - maybe ball velocity is somehow useful -- speed and direction in which it travels, i.e., if the ball is slowly travelling, probarly this is some sort of possession since passes are slower than clearances
+
+
+- player movement: teams who are out of possession tend to move towards the ball, and teams who are in possession (except for the player who has the ball) tend to move away from it
+    - introduce some weight for whether a player is moving towards or away from the ball
