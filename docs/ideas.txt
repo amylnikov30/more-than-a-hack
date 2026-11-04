@@ -5,3 +5,5 @@
 
 - player movement: teams who are out of possession tend to move towards the ball, and teams who are in possession (except for the player who has the ball) tend to move away from it
     - introduce some weight for whether a player is moving towards or away from the ball
+
+- should we be using wavelet denoising? or any other denoising?
