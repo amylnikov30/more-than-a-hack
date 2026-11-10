@@ -35,6 +35,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--n", type=int, default=8)
     ap.add_argument("--quantile", type=float, default=0.9)
+    ap.add_argument("--min-s", type=float, default=None)
+    ap.add_argument("--max-s", type=float, default=None)
     ap.add_argument("--seed", type=int, default=2027)
     ap.add_argument("--out", default=os.path.expanduser("~/eda_out/long_gap_sample.csv"))
     a = ap.parse_args()
@@ -55,8 +57,14 @@ def main():
     gaps = pd.DataFrame(rows)
     gaps = gaps[~gaps.clipped]                       # drop gaps cut by a half boundary
 
-    thr = gaps.n.quantile(a.quantile)
-    long_ = gaps[gaps.n >= thr]
+    if a.min_s is not None or a.max_s is not None:
+        lo_n = (a.min_s or 0) * FPS
+        hi_n = (a.max_s or np.inf) * FPS
+        long_ = gaps[(gaps.n >= lo_n) & (gaps.n <= hi_n)]
+        thr = lo_n
+    else:
+        thr = gaps.n.quantile(a.quantile)
+        long_ = gaps[gaps.n >= thr]
     long_ = long_[~((long_.start <= PUBLIC_GT[1]) & (long_.end >= PUBLIC_GT[0]))]
     long_ = long_[~((long_.half == 2) & (long_.start < KICKOFF_2H))]
 
