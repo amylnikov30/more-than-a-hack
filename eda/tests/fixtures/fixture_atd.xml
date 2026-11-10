@@ -1,0 +1,619 @@
+<?xml version="1.0" encoding="utf-8"?>
+<main>
+  <Metadata>
+    <GlobalConfig>
+      <FileDate>2026-11-10T00:00:00.000Z</FileDate>
+      <FileName>synthetic_fixture</FileName>
+      <TrackingType>Optical</TrackingType>
+      <ProviderName>Synthetic</ProviderName>
+      <FrameRate>25</FrameRate>
+      <ProviderGlobalParameters>
+        <ProviderParameter><Name>first_half_start</Name><Value>1</Value></ProviderParameter>
+        <ProviderParameter><Name>first_half_end</Name><Value>1550</Value></ProviderParameter>
+        <ProviderParameter><Name>second_half_start</Name><Value>1551</Value></ProviderParameter>
+        <ProviderParameter><Name>second_half_end</Name><Value>3000</Value></ProviderParameter>
+      </ProviderGlobalParameters>
+      <FieldSize><Width>105</Width><Height>68</Height></FieldSize>
+    </GlobalConfig>
+    <Sessions>
+      <Session id="1">
+        <SessionType>Match</SessionType>
+        <Start>1</Start>
+        <End>3000</End>
+        <MatchParameters>
+          <Score idLocalTeam="T1" idVisitingTeam="T2">
+            <LocalTeamScore>0</LocalTeamScore>
+            <VisitingTeamScore>0</VisitingTeamScore>
+          </Score>
+        </MatchParameters>
+      </Session>
+    </Sessions>
+    <Teams>
+      <Team id="T1"><Name>Team A</Name></Team>
+      <Team id="T2"><Name>Team B</Name></Team>
+    </Teams>
+    <Players>
+      <Player id="P1" teamId="T1">
+        <Name>Track 1</Name>
+        <ShirtNumber>1</ShirtNumber>
+      </Player>
+      <Player id="P2" teamId="T1">
+        <Name>Track 2</Name>
+        <ShirtNumber>2</ShirtNumber>
+      </Player>
+      <Player id="P3" teamId="T1">
+        <Name>Track 3</Name>
+        <ShirtNumber>3</ShirtNumber>
+      </Player>
+      <Player id="P4" teamId="T1">
+        <Name>Track 4</Name>
+        <ShirtNumber>4</ShirtNumber>
+      </Player>
+      <Player id="P5" teamId="T1">
+        <Name>Track 5</Name>
+        <ShirtNumber>5</ShirtNumber>
+      </Player>
+      <Player id="P6" teamId="T1">
+        <Name>Track 6</Name>
+        <ShirtNumber>6</ShirtNumber>
+      </Player>
+      <Player id="P7" teamId="T1">
+        <Name>Track 7</Name>
+        <ShirtNumber>7</ShirtNumber>
+      </Player>
+      <Player id="P8" teamId="T1">
+        <Name>Track 8</Name>
+        <ShirtNumber>8</ShirtNumber>
+      </Player>
+      <Player id="P9" teamId="T1">
+        <Name>Track 9</Name>
+        <ShirtNumber>9</ShirtNumber>
+      </Player>
+      <Player id="P10" teamId="T1">
+        <Name>Track 10</Name>
+        <ShirtNumber>10</ShirtNumber>
+      </Player>
+      <Player id="P11" teamId="T1">
+        <Name>Track 11</Name>
+        <ShirtNumber>11</ShirtNumber>
+      </Player>
+      <Player id="P12" teamId="T1">
+        <Name>Track 12</Name>
+        <ShirtNumber>12</ShirtNumber>
+      </Player>
+      <Player id="P13" teamId="T1">
+        <Name>Track 13</Name>
+        <ShirtNumber>13</ShirtNumber>
+      </Player>
+      <Player id="P14" teamId="T1">
+        <Name>Track 14</Name>
+        <ShirtNumber>14</ShirtNumber>
+      </Player>
+      <Player id="P15" teamId="T1">
+        <Name>Track 15</Name>
+        <ShirtNumber>15</ShirtNumber>
+      </Player>
+      <Player id="P16" teamId="T1">
+        <Name>Track 16</Name>
+        <ShirtNumber>16</ShirtNumber>
+      </Player>
+      <Player id="P17" teamId="T1">
+        <Name>Track 17</Name>
+        <ShirtNumber>17</ShirtNumber>
+      </Player>
+      <Player id="P18" teamId="T1">
+        <Name>Track 18</Name>
+        <ShirtNumber>18</ShirtNumber>
+      </Player>
+      <Player id="P19" teamId="T1">
+        <Name>Track 19</Name>
+        <ShirtNumber>19</ShirtNumber>
+      </Player>
+      <Player id="P20" teamId="T1">
+        <Name>Track 20</Name>
+        <ShirtNumber>20</ShirtNumber>
+      </Player>
+      <Player id="P21" teamId="T1">
+        <Name>Track 21</Name>
+        <ShirtNumber>21</ShirtNumber>
+      </Player>
+      <Player id="P22" teamId="T1">
+        <Name>Track 22</Name>
+        <ShirtNumber>22</ShirtNumber>
+      </Player>
+      <Player id="P23" teamId="T1">
+        <Name>Track 23</Name>
+        <ShirtNumber>23</ShirtNumber>
+      </Player>
+      <Player id="P24" teamId="T2">
+        <Name>Track 24</Name>
+        <ShirtNumber>24</ShirtNumber>
+      </Player>
+      <Player id="P25" teamId="T2">
+        <Name>Track 25</Name>
+        <ShirtNumber>25</ShirtNumber>
+      </Player>
+      <Player id="P26" teamId="T2">
+        <Name>Track 26</Name>
+        <ShirtNumber>26</ShirtNumber>
+      </Player>
+      <Player id="P27" teamId="T2">
+        <Name>Track 27</Name>
+        <ShirtNumber>27</ShirtNumber>
+      </Player>
+      <Player id="P28" teamId="T2">
+        <Name>Track 28</Name>
+        <ShirtNumber>28</ShirtNumber>
+      </Player>
+      <Player id="P29" teamId="T2">
+        <Name>Track 29</Name>
+        <ShirtNumber>29</ShirtNumber>
+      </Player>
+      <Player id="P30" teamId="T2">
+        <Name>Track 30</Name>
+        <ShirtNumber>30</ShirtNumber>
+      </Player>
+      <Player id="P31" teamId="T2">
+        <Name>Track 31</Name>
+        <ShirtNumber>31</ShirtNumber>
+      </Player>
+      <Player id="P32" teamId="T2">
+        <Name>Track 32</Name>
+        <ShirtNumber>32</ShirtNumber>
+      </Player>
+      <Player id="P33" teamId="T2">
+        <Name>Track 33</Name>
+        <ShirtNumber>33</ShirtNumber>
+      </Player>
+      <Player id="P34" teamId="T2">
+        <Name>Track 34</Name>
+        <ShirtNumber>34</ShirtNumber>
+      </Player>
+      <Player id="P35" teamId="T2">
+        <Name>Track 35</Name>
+        <ShirtNumber>35</ShirtNumber>
+      </Player>
+      <Player id="P36" teamId="T2">
+        <Name>Track 36</Name>
+        <ShirtNumber>36</ShirtNumber>
+      </Player>
+      <Player id="P37" teamId="T2">
+        <Name>Track 37</Name>
+        <ShirtNumber>37</ShirtNumber>
+      </Player>
+      <Player id="P38" teamId="T2">
+        <Name>Track 38</Name>
+        <ShirtNumber>38</ShirtNumber>
+      </Player>
+      <Player id="P39" teamId="T2">
+        <Name>Track 39</Name>
+        <ShirtNumber>39</ShirtNumber>
+      </Player>
+      <Player id="P40" teamId="T2">
+        <Name>Track 40</Name>
+        <ShirtNumber>40</ShirtNumber>
+      </Player>
+      <Player id="P41" teamId="T2">
+        <Name>Track 41</Name>
+        <ShirtNumber>41</ShirtNumber>
+      </Player>
+      <Player id="P42" teamId="T2">
+        <Name>Track 42</Name>
+        <ShirtNumber>42</ShirtNumber>
+      </Player>
+      <Player id="P43" teamId="T2">
+        <Name>Track 43</Name>
+        <ShirtNumber>43</ShirtNumber>
+      </Player>
+      <Player id="P44" teamId="T2">
+        <Name>Track 44</Name>
+        <ShirtNumber>44</ShirtNumber>
+      </Player>
+      <Player id="P45" teamId="T2">
+        <Name>Track 45</Name>
+        <ShirtNumber>45</ShirtNumber>
+      </Player>
+      <Player id="P46" teamId="T2">
+        <Name>Track 46</Name>
+        <ShirtNumber>46</ShirtNumber>
+      </Player>
+    </Players>
+    <Devices>
+      <Device id="device1">
+        <Name>Device 1</Name>
+        <Sensors>
+          <Sensor id="position">
+            <Name>Position</Name>
+            <Channels>
+              <Channel id="x"><Name>position_x</Name><Unit>normalized</Unit></Channel>
+              <Channel id="y"><Name>position_y</Name><Unit>normalized</Unit></Channel>
+              <Channel id="speed"><Name>speed</Name><Unit>meters per second</Unit></Channel>
+            </Channels>
+          </Sensor>
+        </Sensors>
+      </Device>
+    </Devices>
+    <PlayerChannels>
+      <PlayerChannel id="player1_x" playerId="P1" channelId="x"/>
+      <PlayerChannel id="player1_y" playerId="P1" channelId="y"/>
+      <PlayerChannel id="player1_speed" playerId="P1" channelId="speed"/>
+      <PlayerChannel id="player2_x" playerId="P2" channelId="x"/>
+      <PlayerChannel id="player2_y" playerId="P2" channelId="y"/>
+      <PlayerChannel id="player2_speed" playerId="P2" channelId="speed"/>
+      <PlayerChannel id="player3_x" playerId="P3" channelId="x"/>
+      <PlayerChannel id="player3_y" playerId="P3" channelId="y"/>
+      <PlayerChannel id="player3_speed" playerId="P3" channelId="speed"/>
+      <PlayerChannel id="player4_x" playerId="P4" channelId="x"/>
+      <PlayerChannel id="player4_y" playerId="P4" channelId="y"/>
+      <PlayerChannel id="player4_speed" playerId="P4" channelId="speed"/>
+      <PlayerChannel id="player5_x" playerId="P5" channelId="x"/>
+      <PlayerChannel id="player5_y" playerId="P5" channelId="y"/>
+      <PlayerChannel id="player5_speed" playerId="P5" channelId="speed"/>
+      <PlayerChannel id="player6_x" playerId="P6" channelId="x"/>
+      <PlayerChannel id="player6_y" playerId="P6" channelId="y"/>
+      <PlayerChannel id="player6_speed" playerId="P6" channelId="speed"/>
+      <PlayerChannel id="player7_x" playerId="P7" channelId="x"/>
+      <PlayerChannel id="player7_y" playerId="P7" channelId="y"/>
+      <PlayerChannel id="player7_speed" playerId="P7" channelId="speed"/>
+      <PlayerChannel id="player8_x" playerId="P8" channelId="x"/>
+      <PlayerChannel id="player8_y" playerId="P8" channelId="y"/>
+      <PlayerChannel id="player8_speed" playerId="P8" channelId="speed"/>
+      <PlayerChannel id="player9_x" playerId="P9" channelId="x"/>
+      <PlayerChannel id="player9_y" playerId="P9" channelId="y"/>
+      <PlayerChannel id="player9_speed" playerId="P9" channelId="speed"/>
+      <PlayerChannel id="player10_x" playerId="P10" channelId="x"/>
+      <PlayerChannel id="player10_y" playerId="P10" channelId="y"/>
+      <PlayerChannel id="player10_speed" playerId="P10" channelId="speed"/>
+      <PlayerChannel id="player11_x" playerId="P11" channelId="x"/>
+      <PlayerChannel id="player11_y" playerId="P11" channelId="y"/>
+      <PlayerChannel id="player11_speed" playerId="P11" channelId="speed"/>
+      <PlayerChannel id="player12_x" playerId="P12" channelId="x"/>
+      <PlayerChannel id="player12_y" playerId="P12" channelId="y"/>
+      <PlayerChannel id="player12_speed" playerId="P12" channelId="speed"/>
+      <PlayerChannel id="player13_x" playerId="P13" channelId="x"/>
+      <PlayerChannel id="player13_y" playerId="P13" channelId="y"/>
+      <PlayerChannel id="player13_speed" playerId="P13" channelId="speed"/>
+      <PlayerChannel id="player14_x" playerId="P14" channelId="x"/>
+      <PlayerChannel id="player14_y" playerId="P14" channelId="y"/>
+      <PlayerChannel id="player14_speed" playerId="P14" channelId="speed"/>
+      <PlayerChannel id="player15_x" playerId="P15" channelId="x"/>
+      <PlayerChannel id="player15_y" playerId="P15" channelId="y"/>
+      <PlayerChannel id="player15_speed" playerId="P15" channelId="speed"/>
+      <PlayerChannel id="player16_x" playerId="P16" channelId="x"/>
+      <PlayerChannel id="player16_y" playerId="P16" channelId="y"/>
+      <PlayerChannel id="player16_speed" playerId="P16" channelId="speed"/>
+      <PlayerChannel id="player17_x" playerId="P17" channelId="x"/>
+      <PlayerChannel id="player17_y" playerId="P17" channelId="y"/>
+      <PlayerChannel id="player17_speed" playerId="P17" channelId="speed"/>
+      <PlayerChannel id="player18_x" playerId="P18" channelId="x"/>
+      <PlayerChannel id="player18_y" playerId="P18" channelId="y"/>
+      <PlayerChannel id="player18_speed" playerId="P18" channelId="speed"/>
+      <PlayerChannel id="player19_x" playerId="P19" channelId="x"/>
+      <PlayerChannel id="player19_y" playerId="P19" channelId="y"/>
+      <PlayerChannel id="player19_speed" playerId="P19" channelId="speed"/>
+      <PlayerChannel id="player20_x" playerId="P20" channelId="x"/>
+      <PlayerChannel id="player20_y" playerId="P20" channelId="y"/>
+      <PlayerChannel id="player20_speed" playerId="P20" channelId="speed"/>
+      <PlayerChannel id="player21_x" playerId="P21" channelId="x"/>
+      <PlayerChannel id="player21_y" playerId="P21" channelId="y"/>
+      <PlayerChannel id="player21_speed" playerId="P21" channelId="speed"/>
+      <PlayerChannel id="player22_x" playerId="P22" channelId="x"/>
+      <PlayerChannel id="player22_y" playerId="P22" channelId="y"/>
+      <PlayerChannel id="player22_speed" playerId="P22" channelId="speed"/>
+      <PlayerChannel id="player23_x" playerId="P23" channelId="x"/>
+      <PlayerChannel id="player23_y" playerId="P23" channelId="y"/>
+      <PlayerChannel id="player23_speed" playerId="P23" channelId="speed"/>
+      <PlayerChannel id="player24_x" playerId="P24" channelId="x"/>
+      <PlayerChannel id="player24_y" playerId="P24" channelId="y"/>
+      <PlayerChannel id="player24_speed" playerId="P24" channelId="speed"/>
+      <PlayerChannel id="player25_x" playerId="P25" channelId="x"/>
+      <PlayerChannel id="player25_y" playerId="P25" channelId="y"/>
+      <PlayerChannel id="player25_speed" playerId="P25" channelId="speed"/>
+      <PlayerChannel id="player26_x" playerId="P26" channelId="x"/>
+      <PlayerChannel id="player26_y" playerId="P26" channelId="y"/>
+      <PlayerChannel id="player26_speed" playerId="P26" channelId="speed"/>
+      <PlayerChannel id="player27_x" playerId="P27" channelId="x"/>
+      <PlayerChannel id="player27_y" playerId="P27" channelId="y"/>
+      <PlayerChannel id="player27_speed" playerId="P27" channelId="speed"/>
+      <PlayerChannel id="player28_x" playerId="P28" channelId="x"/>
+      <PlayerChannel id="player28_y" playerId="P28" channelId="y"/>
+      <PlayerChannel id="player28_speed" playerId="P28" channelId="speed"/>
+      <PlayerChannel id="player29_x" playerId="P29" channelId="x"/>
+      <PlayerChannel id="player29_y" playerId="P29" channelId="y"/>
+      <PlayerChannel id="player29_speed" playerId="P29" channelId="speed"/>
+      <PlayerChannel id="player30_x" playerId="P30" channelId="x"/>
+      <PlayerChannel id="player30_y" playerId="P30" channelId="y"/>
+      <PlayerChannel id="player30_speed" playerId="P30" channelId="speed"/>
+      <PlayerChannel id="player31_x" playerId="P31" channelId="x"/>
+      <PlayerChannel id="player31_y" playerId="P31" channelId="y"/>
+      <PlayerChannel id="player31_speed" playerId="P31" channelId="speed"/>
+      <PlayerChannel id="player32_x" playerId="P32" channelId="x"/>
+      <PlayerChannel id="player32_y" playerId="P32" channelId="y"/>
+      <PlayerChannel id="player32_speed" playerId="P32" channelId="speed"/>
+      <PlayerChannel id="player33_x" playerId="P33" channelId="x"/>
+      <PlayerChannel id="player33_y" playerId="P33" channelId="y"/>
+      <PlayerChannel id="player33_speed" playerId="P33" channelId="speed"/>
+      <PlayerChannel id="player34_x" playerId="P34" channelId="x"/>
+      <PlayerChannel id="player34_y" playerId="P34" channelId="y"/>
+      <PlayerChannel id="player34_speed" playerId="P34" channelId="speed"/>
+      <PlayerChannel id="player35_x" playerId="P35" channelId="x"/>
+      <PlayerChannel id="player35_y" playerId="P35" channelId="y"/>
+      <PlayerChannel id="player35_speed" playerId="P35" channelId="speed"/>
+      <PlayerChannel id="player36_x" playerId="P36" channelId="x"/>
+      <PlayerChannel id="player36_y" playerId="P36" channelId="y"/>
+      <PlayerChannel id="player36_speed" playerId="P36" channelId="speed"/>
+      <PlayerChannel id="player37_x" playerId="P37" channelId="x"/>
+      <PlayerChannel id="player37_y" playerId="P37" channelId="y"/>
+      <PlayerChannel id="player37_speed" playerId="P37" channelId="speed"/>
+      <PlayerChannel id="player38_x" playerId="P38" channelId="x"/>
+      <PlayerChannel id="player38_y" playerId="P38" channelId="y"/>
+      <PlayerChannel id="player38_speed" playerId="P38" channelId="speed"/>
+      <PlayerChannel id="player39_x" playerId="P39" channelId="x"/>
+      <PlayerChannel id="player39_y" playerId="P39" channelId="y"/>
+      <PlayerChannel id="player39_speed" playerId="P39" channelId="speed"/>
+      <PlayerChannel id="player40_x" playerId="P40" channelId="x"/>
+      <PlayerChannel id="player40_y" playerId="P40" channelId="y"/>
+      <PlayerChannel id="player40_speed" playerId="P40" channelId="speed"/>
+      <PlayerChannel id="player41_x" playerId="P41" channelId="x"/>
+      <PlayerChannel id="player41_y" playerId="P41" channelId="y"/>
+      <PlayerChannel id="player41_speed" playerId="P41" channelId="speed"/>
+      <PlayerChannel id="player42_x" playerId="P42" channelId="x"/>
+      <PlayerChannel id="player42_y" playerId="P42" channelId="y"/>
+      <PlayerChannel id="player42_speed" playerId="P42" channelId="speed"/>
+      <PlayerChannel id="player43_x" playerId="P43" channelId="x"/>
+      <PlayerChannel id="player43_y" playerId="P43" channelId="y"/>
+      <PlayerChannel id="player43_speed" playerId="P43" channelId="speed"/>
+      <PlayerChannel id="player44_x" playerId="P44" channelId="x"/>
+      <PlayerChannel id="player44_y" playerId="P44" channelId="y"/>
+      <PlayerChannel id="player44_speed" playerId="P44" channelId="speed"/>
+      <PlayerChannel id="player45_x" playerId="P45" channelId="x"/>
+      <PlayerChannel id="player45_y" playerId="P45" channelId="y"/>
+      <PlayerChannel id="player45_speed" playerId="P45" channelId="speed"/>
+      <PlayerChannel id="player46_x" playerId="P46" channelId="x"/>
+      <PlayerChannel id="player46_y" playerId="P46" channelId="y"/>
+      <PlayerChannel id="player46_speed" playerId="P46" channelId="speed"/>
+    </PlayerChannels>
+  </Metadata>
+  <DataFormatSpecifications>
+    <DataFormatSpecification endFrame="3000" separator=":" startFrame="1">
+      <StringRegister name="frameCount"/>
+      <SplitRegister separator=";">
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player1_x"/>
+          <PlayerChannelRef playerChannelId="player1_y"/>
+          <PlayerChannelRef playerChannelId="player1_speed"/>
+        </SplitRegister>
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player2_x"/>
+          <PlayerChannelRef playerChannelId="player2_y"/>
+          <PlayerChannelRef playerChannelId="player2_speed"/>
+        </SplitRegister>
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player3_x"/>
+          <PlayerChannelRef playerChannelId="player3_y"/>
+          <PlayerChannelRef playerChannelId="player3_speed"/>
+        </SplitRegister>
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player4_x"/>
+          <PlayerChannelRef playerChannelId="player4_y"/>
+          <PlayerChannelRef playerChannelId="player4_speed"/>
+        </SplitRegister>
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player5_x"/>
+          <PlayerChannelRef playerChannelId="player5_y"/>
+          <PlayerChannelRef playerChannelId="player5_speed"/>
+        </SplitRegister>
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player6_x"/>
+          <PlayerChannelRef playerChannelId="player6_y"/>
+          <PlayerChannelRef playerChannelId="player6_speed"/>
+        </SplitRegister>
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player7_x"/>
+          <PlayerChannelRef playerChannelId="player7_y"/>
+          <PlayerChannelRef playerChannelId="player7_speed"/>
+        </SplitRegister>
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player8_x"/>
+          <PlayerChannelRef playerChannelId="player8_y"/>
+          <PlayerChannelRef playerChannelId="player8_speed"/>
+        </SplitRegister>
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player9_x"/>
+          <PlayerChannelRef playerChannelId="player9_y"/>
+          <PlayerChannelRef playerChannelId="player9_speed"/>
+        </SplitRegister>
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player10_x"/>
+          <PlayerChannelRef playerChannelId="player10_y"/>
+          <PlayerChannelRef playerChannelId="player10_speed"/>
+        </SplitRegister>
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player11_x"/>
+          <PlayerChannelRef playerChannelId="player11_y"/>
+          <PlayerChannelRef playerChannelId="player11_speed"/>
+        </SplitRegister>
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player12_x"/>
+          <PlayerChannelRef playerChannelId="player12_y"/>
+          <PlayerChannelRef playerChannelId="player12_speed"/>
+        </SplitRegister>
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player13_x"/>
+          <PlayerChannelRef playerChannelId="player13_y"/>
+          <PlayerChannelRef playerChannelId="player13_speed"/>
+        </SplitRegister>
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player14_x"/>
+          <PlayerChannelRef playerChannelId="player14_y"/>
+          <PlayerChannelRef playerChannelId="player14_speed"/>
+        </SplitRegister>
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player15_x"/>
+          <PlayerChannelRef playerChannelId="player15_y"/>
+          <PlayerChannelRef playerChannelId="player15_speed"/>
+        </SplitRegister>
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player16_x"/>
+          <PlayerChannelRef playerChannelId="player16_y"/>
+          <PlayerChannelRef playerChannelId="player16_speed"/>
+        </SplitRegister>
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player17_x"/>
+          <PlayerChannelRef playerChannelId="player17_y"/>
+          <PlayerChannelRef playerChannelId="player17_speed"/>
+        </SplitRegister>
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player18_x"/>
+          <PlayerChannelRef playerChannelId="player18_y"/>
+          <PlayerChannelRef playerChannelId="player18_speed"/>
+        </SplitRegister>
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player19_x"/>
+          <PlayerChannelRef playerChannelId="player19_y"/>
+          <PlayerChannelRef playerChannelId="player19_speed"/>
+        </SplitRegister>
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player20_x"/>
+          <PlayerChannelRef playerChannelId="player20_y"/>
+          <PlayerChannelRef playerChannelId="player20_speed"/>
+        </SplitRegister>
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player21_x"/>
+          <PlayerChannelRef playerChannelId="player21_y"/>
+          <PlayerChannelRef playerChannelId="player21_speed"/>
+        </SplitRegister>
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player22_x"/>
+          <PlayerChannelRef playerChannelId="player22_y"/>
+          <PlayerChannelRef playerChannelId="player22_speed"/>
+        </SplitRegister>
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player23_x"/>
+          <PlayerChannelRef playerChannelId="player23_y"/>
+          <PlayerChannelRef playerChannelId="player23_speed"/>
+        </SplitRegister>
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player24_x"/>
+          <PlayerChannelRef playerChannelId="player24_y"/>
+          <PlayerChannelRef playerChannelId="player24_speed"/>
+        </SplitRegister>
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player25_x"/>
+          <PlayerChannelRef playerChannelId="player25_y"/>
+          <PlayerChannelRef playerChannelId="player25_speed"/>
+        </SplitRegister>
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player26_x"/>
+          <PlayerChannelRef playerChannelId="player26_y"/>
+          <PlayerChannelRef playerChannelId="player26_speed"/>
+        </SplitRegister>
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player27_x"/>
+          <PlayerChannelRef playerChannelId="player27_y"/>
+          <PlayerChannelRef playerChannelId="player27_speed"/>
+        </SplitRegister>
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player28_x"/>
+          <PlayerChannelRef playerChannelId="player28_y"/>
+          <PlayerChannelRef playerChannelId="player28_speed"/>
+        </SplitRegister>
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player29_x"/>
+          <PlayerChannelRef playerChannelId="player29_y"/>
+          <PlayerChannelRef playerChannelId="player29_speed"/>
+        </SplitRegister>
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player30_x"/>
+          <PlayerChannelRef playerChannelId="player30_y"/>
+          <PlayerChannelRef playerChannelId="player30_speed"/>
+        </SplitRegister>
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player31_x"/>
+          <PlayerChannelRef playerChannelId="player31_y"/>
+          <PlayerChannelRef playerChannelId="player31_speed"/>
+        </SplitRegister>
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player32_x"/>
+          <PlayerChannelRef playerChannelId="player32_y"/>
+          <PlayerChannelRef playerChannelId="player32_speed"/>
+        </SplitRegister>
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player33_x"/>
+          <PlayerChannelRef playerChannelId="player33_y"/>
+          <PlayerChannelRef playerChannelId="player33_speed"/>
+        </SplitRegister>
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player34_x"/>
+          <PlayerChannelRef playerChannelId="player34_y"/>
+          <PlayerChannelRef playerChannelId="player34_speed"/>
+        </SplitRegister>
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player35_x"/>
+          <PlayerChannelRef playerChannelId="player35_y"/>
+          <PlayerChannelRef playerChannelId="player35_speed"/>
+        </SplitRegister>
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player36_x"/>
+          <PlayerChannelRef playerChannelId="player36_y"/>
+          <PlayerChannelRef playerChannelId="player36_speed"/>
+        </SplitRegister>
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player37_x"/>
+          <PlayerChannelRef playerChannelId="player37_y"/>
+          <PlayerChannelRef playerChannelId="player37_speed"/>
+        </SplitRegister>
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player38_x"/>
+          <PlayerChannelRef playerChannelId="player38_y"/>
+          <PlayerChannelRef playerChannelId="player38_speed"/>
+        </SplitRegister>
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player39_x"/>
+          <PlayerChannelRef playerChannelId="player39_y"/>
+          <PlayerChannelRef playerChannelId="player39_speed"/>
+        </SplitRegister>
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player40_x"/>
+          <PlayerChannelRef playerChannelId="player40_y"/>
+          <PlayerChannelRef playerChannelId="player40_speed"/>
+        </SplitRegister>
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player41_x"/>
+          <PlayerChannelRef playerChannelId="player41_y"/>
+          <PlayerChannelRef playerChannelId="player41_speed"/>
+        </SplitRegister>
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player42_x"/>
+          <PlayerChannelRef playerChannelId="player42_y"/>
+          <PlayerChannelRef playerChannelId="player42_speed"/>
+        </SplitRegister>
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player43_x"/>
+          <PlayerChannelRef playerChannelId="player43_y"/>
+          <PlayerChannelRef playerChannelId="player43_speed"/>
+        </SplitRegister>
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player44_x"/>
+          <PlayerChannelRef playerChannelId="player44_y"/>
+          <PlayerChannelRef playerChannelId="player44_speed"/>
+        </SplitRegister>
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player45_x"/>
+          <PlayerChannelRef playerChannelId="player45_y"/>
+          <PlayerChannelRef playerChannelId="player45_speed"/>
+        </SplitRegister>
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player46_x"/>
+          <PlayerChannelRef playerChannelId="player46_y"/>
+          <PlayerChannelRef playerChannelId="player46_speed"/>
+        </SplitRegister>
+      </SplitRegister>
+      <SplitRegister separator=",">
+        <BallChannelRef channelId="x"/>
+        <BallChannelRef channelId="y"/>
+        <BallChannelRef channelId="speed"/>
+      </SplitRegister>
+    </DataFormatSpecification>
+  </DataFormatSpecifications>
+</main>

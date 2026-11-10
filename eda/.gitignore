@@ -1,0 +1,25 @@
+# outputs and caches -- never commit these
+out/
+eda_out/
+*_out/
+outputs/
+results/
+*.csv
+!tests/fixtures/*.csv
+*.png
+*.parquet
+*.pkl
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ipynb_checkpoints/
+.DS_Store
+.Rhistory
+# never put match data or sample data here
+data/
+sample-data/
+*_atd.txt
+*_tracking.txt
+*.mp4
+# synthetic test fixtures are committed even where the patterns above would match
+!tests/fixtures/*
