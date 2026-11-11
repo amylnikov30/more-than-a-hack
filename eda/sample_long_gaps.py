@@ -9,13 +9,13 @@ Usage (needs ball_gaps.py next to this file; stdlib + numpy only)
     # competition match: paths from games.asset_paths(), graded frames from
     # games.half_video_blocks(GAME); --exclude defaults to the public GT window and the
     # second-half pre-kickoff frames
-    PYTHONPATH=/path/to/more-than-a-hack-2027 python sample_long_gaps.py OUT_DIR
+    PYTHONPATH=/path/to/team-repo python eda/sample_long_gaps.py OUT_DIR
 
     # any other game in the raw ATD format
     python sample_long_gaps.py OUT_DIR --raw RAW.txt --frames 0-69660,69661-143760
 
-Writes OUT_DIR/long_gap_sample.csv. That file is FRAME-INDEXED by design: keep it on the VM and
-never paste it into a hosted AI. stdout carries only aggregate counts.
+Writes OUT_DIR/long_gap_sample.csv. That file is FRAME-INDEXED by design: never commit it.
+stdout carries only aggregate counts.
 """
 
 import argparse
@@ -169,7 +169,7 @@ def main(argv=None):
             else "q={} -> {:.1f} s".format(a.quantile, res["threshold_frames"] / a.fps))
     print("gaps: {} ({} not cut by a half edge); eligible ({}, {} exclude range(s)): {}".format(
         res["n_gaps"], res["n_candidates"], rule, len(exclude), len(res["eligible"])))
-    print("sampled {} (per half {}) -> {} (frame-indexed: keep on the VM)".format(
+    print("sampled {} (per half {}) -> {} (frame-indexed: do not commit)".format(
         len(res["sample"]), ", ".join("{}: {}".format(h, v) for h, v in res["quotas"].items()),
         path))
     return res

@@ -218,3 +218,103 @@ ball is NaN on frame_id 4-5 and the line for frame_id 8 is absent. The gaps are 
 **`--csv-name`.** `--min-s 2 --csv-name gap_test.csv` writes `OUT/gap_test.csv`, with the same 4
 rows as `--min-s 2`, and no `long_gap_sample.csv`. A name containing a path separator
 (`sub/x.csv`) or not ending in `.csv` is a usage error (`SystemExit`).
+
+# `tag_gaps.py`: gaps vs Smart Tagging codes
+
+`fixture_tags.xml` (SportsCode XML, 10 instances) on top of the main ATD fixture, graded
+`--frames 100-1499,1600-2899`. Frames are `round(s * 25)`, end exclusive. Tag times are chosen as
+whole frames (s = f / 25), so rounding never matters.
+
+| # | code (as written) | frames | Type | why |
+|---|---|---|---|---|
+| T1 | `SET PIECES` | [905, 1000) | Goal Kick | starts 5 fr after G5 reappears (900): **links**, but does not overlap G5 |
+| T2 | `Set Pieces` | [560, 600) | Throw-in | starts 10 fr after G4 reappears (550): links |
+| T3 | `SET PIECES` | [2100, 2200) | Corner Kick | starts on G9's reappearance (2100): links |
+| T4 | `set pieces` | [1250, 1300) | Free Kick | no gap near: control |
+| T5 | `SET PIECES` | [25, 75) | Kick Off (Start) | anchor ungraded: dropped from profiles, links and recall |
+| T6 | `PROGRESSION` | [680, 800) | - | overlaps G5; starts 130 fr after G4 reappears: just outside W |
+| T7 | `Long Ball` | [1490, 1650) | - | crosses halftime: overlaps G6 and G7 |
+| T8 | `BUILD UP` | [1835, 1900) | - | starts 4 fr after G8 reappears (1831): a non-set-piece code that links |
+| T9 | `SET PIECES` | [2660, 2700) | Throw-in | links G10 (2650) and G11 (2702); ends exactly where G11 starts: no overlap |
+| T10 | `GOALS` | [2300, 2400) | - | nothing near: control |
+
+## Rules (decided before coding)
+
+- Codes are stripped and upper-cased. Groups are `code:<CODE>` for every code, plus
+  `type:<Type>` for SET PIECES instances that have a `Type`.
+- A tag's **anchor** is its start frame (or its end frame for end-aligned profiles). Its half is
+  the graded block holding the anchor. A tag whose anchor is not graded is dropped from profiles,
+  links and recall, and counted as `n_dropped`.
+- **Reappearance** of a gap = `next_seen` from `find_gaps`. A gap is **linkable** only if
+  `next_seen` is a graded frame in the gap's own half. G6 (`next_seen` 1531, halftime) is the only
+  unlinkable gap here. Unlinkable gaps stay in the denominators and never link.
+- A gap **links** to a group if some anchor a of that group, in the same half, has
+  `|next_seen - a| <= W` (W = `--link-window`, default 5 s = 125 fr).
+- A gap **overlaps** a group as in (b): inclusive gap `[s, e]` and tag `[a - tol, b + tol)`
+  with `a - tol <= e` and `b + tol > s` (`--tag-tolerance`, default 0).
+- **View A profile.** Bins are `[t + k*B, t + (k+1)*B)` for k = -W_A/B ... W_A/B - 1
+  (B = `--bin`, W_A = `--window`; W_A must be a multiple of B). Only graded frames in the
+  anchor's own half count. The value per bin is the pooled share: missing frames / counted
+  frames over all instances. With no counted frames it is empty (NaN). Bins are labelled by
+  their left edge in seconds.
+- **View B strata** (s, half-open): `[0,2) [2,5) [5,10) [10,20) [20,35) [35,inf)`, on the
+  clipped length as in (a).
+- **View C.** For a threshold L, the gaps with `length >= L * 25` are the "long" gaps.
+  Precision = long gaps that link to the group / long gaps. Recall = graded anchors of the group
+  with at least one long gap linked / graded anchors. Each gap and each anchor counts once.
+  Frame share = frames in long gaps / graded frames (the same for every group).
+- **Nulls (A and B)** shift the group's anchors (A) or intervals (B) circularly within each
+  half, as in (e). Window frames are not wrapped: they are clipped to the half, exactly as in the
+  observed profile. With offset 0 the null equals the observed value.
+
+## Expected
+
+Reappearance frames: G1 205, G2 312, G3 413, G4 550, G5 900, G6 1531 (unlinkable), G7 1620,
+G8 1831, G9 2100, G10 2650, G11 2702. Baseline P(missing) on graded frames = 633 / 2700 =
+0.23444.
+
+**View B, all 11 gaps** (strata: `[0,2)` G1 G2 G3 G7 G8 G11 = 6; `[2,5)` G4 G6 G9 = 3;
+`[5,10)` G5 G10 = 2; the rest 0).
+
+| group | overlap (tol 0) | overlap (tol 1 s) | link (W 5 s) |
+|---|---|---|---|
+| `code:SET PIECES` | 0 / 11 | 5 / 11 (G4 G5 G9 G10 G11) | 5 / 11: G4 G5 G9 G10 G11. By stratum `[0,2)` 1/6, `[2,5)` 2/3, `[5,10)` 2/2 |
+| `code:PROGRESSION` | 1 / 11 (G5, `[5,10)`) | | 0 / 11 |
+| `code:LONG BALL` | 2 / 11 (G6 `[2,5)`, G7 `[0,2)`) | | 0 / 11 |
+| `code:BUILD UP` | 0 / 11 | | 1 / 11 (G8, `[0,2)`) |
+| `code:GOALS` | 0 / 11 | | 0 / 11 |
+| `type:Throw-in` | | | 3 / 11 (G4, G10, G11) |
+| `type:Goal Kick` | | | 1 / 11 (G5) |
+| `type:Corner Kick` | | | 1 / 11 (G9) |
+| `type:Free Kick` | | | 0 / 11 |
+| `type:Kick Off (Start)` | | | 0 / 11; n_dropped 1 |
+
+With `--link-window 2` (50 fr), SET PIECES links G4 (10), G5 (5), G9 (0), G10 (10), and G11
+(42): still 5 / 11. BUILD UP still links G8.
+
+**View A, `--window 2 --bin 1`** (bins -2, -1, 0, 1 s = offsets [-50,-25), [-25,0), [0,25),
+[25,50)):
+
+| group, anchor | instances | -2 s | -1 s | 0 s | 1 s |
+|---|---|---|---|---|---|
+| `type:Throw-in`, start (560, 2660) | 2 | 50/50 = 1.0 | 30/50 = 0.6 | 0/50 = 0.0 | 2/50 = 0.04 |
+| `type:Throw-in`, end (600, 2700) | 2 | 0/50 = 0.0 | 0/50 = 0.0 | 2/50 = 0.04 | 0/50 = 0.0 |
+| `code:LONG BALL`, start (1490) | 1 | 15/25 = 0.6 | 25/25 = 1.0 | 10/10 = 1.0 (only 1490-1499 graded) | NaN (0 counted) |
+| `type:Kick Off (Start)`, start | 0, n_dropped 1 | NaN | NaN | NaN | NaN |
+
+**View C, `code:SET PIECES`, W 5 s.** Graded anchors: 905, 560, 2100, 1250, 2660 (5; 25 dropped).
+
+| L | long gaps | linked | precision | anchors hit | recall | frame share |
+|---|---|---|---|---|---|---|
+| 0 s | 11 | G4 G5 G9 G10 G11 = 5 | 0.45455 | 905 560 2100 2660 = 4 | 0.8 | 633/2700 = 0.23444 |
+| 2 s | G4 G5 G6 G9 G10 = 5 | G4 G5 G9 G10 = 4 | 0.8 | 4 | 0.8 | 550/2700 = 0.20370 |
+| 5 s | G5 G10 = 2 | 2 | 1.0 | 905 2660 = 2 | 0.4 | 350/2700 = 0.12963 |
+
+By Type at L = 2 s: Throw-in 2/5 = 0.4 precision, recall 2/2; Goal Kick 1/5 = 0.2, 1/1; Corner
+Kick 1/5 = 0.2, 1/1; Free Kick 0/5, 0/1; Kick Off (Start) 0/5, recall NaN (0 graded anchors).
+Throw-in at L = 5 s: 1/2 = 0.5, recall 1/2 = 0.5.
+
+**Other checks.** `read_set_pieces` on `fixture_smart_tagging.xml` is unchanged. Null offset 0
+equals the observed profile and observed shares. The vectorised profile null equals a slow
+per-shift loop. The same seed gives identical null statistics. Like (e), the fixture needs
+`--null-min-shift 5`.

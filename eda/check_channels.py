@@ -8,7 +8,7 @@ Reads only the metadata XML -- never the raw tracking -- and reports, in declara
 
 Usage
     # competition match (paths from games.asset_paths(), honours MTAH_DATA_DIR)
-    PYTHONPATH=/path/to/more-than-a-hack-2027 python check_channels.py OUT_DIR
+    PYTHONPATH=/path/to/team-repo python eda/check_channels.py OUT_DIR
     # any other EPTS metadata file, e.g. Metrica Sample Game 3
     python check_channels.py OUT_DIR --meta /path/to/Sample_Game_3_metadata.xml
 
@@ -218,7 +218,7 @@ def default_meta(source):
     try:
         import games
     except ImportError:
-        sys.exit("cannot import games.py -- set PYTHONPATH to the public repo, or pass --meta")
+        sys.exit("cannot import games.py -- set PYTHONPATH to the team repo root, or pass --meta")
     try:
         return games.require(["atd_meta"], source=source)[0]
     except (IOError, OSError) as err:

@@ -12,7 +12,7 @@
 Usage
     # competition match: paths from games.asset_paths() (honours MTAH_DATA_DIR), graded frames
     # from games.half_video_blocks("BAR-ATH")
-    PYTHONPATH=/path/to/more-than-a-hack-2027 python ball_gaps.py OUT_DIR
+    PYTHONPATH=/path/to/team-repo python eda/ball_gaps.py OUT_DIR
 
     # any other game in the same raw format, e.g. Metrica Sample Game 3 (no Smart Tagging)
     python ball_gaps.py OUT_DIR --raw Sample_Game_3_tracking.txt \\
@@ -787,7 +787,7 @@ def _games():
     try:
         import games
     except ImportError:
-        sys.exit("cannot import games.py -- set PYTHONPATH to the public repo, "
+        sys.exit("cannot import games.py -- set PYTHONPATH to the team repo root, "
                  "or pass --raw and --frames")
     return games
 

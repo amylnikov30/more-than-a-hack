@@ -10,6 +10,8 @@ Files written
     fixture_atd.txt.gz         raw tracking, 3,000 frames (frame_id 1..3000), gzipped because
                                46 slots x 3,000 frames of plain text is ~2 MB
     fixture_smart_tagging.xml  SportsCode XML with SET PIECES (mixed case) and one BUILD UP
+    fixture_tags.xml           SportsCode XML with several codes and set-piece Types, for
+                               tag_gaps.py (whole-frame times)
 
 The design (gaps, tags, crowding) is in the constants below; the hand-derived answers it implies
 are in tests/fixtures/README.md and asserted in tests/test_ball_gaps.py.
@@ -71,6 +73,21 @@ TAGS = [
     ("BUILD UP", 79.0, 85.0, "Team A", None),              # [1975, 2125): overlaps G9, wrong code
     ("Set Pieces", 84.0, 86.0, "Team B", "Corner Kick"),   # [2100, 2150): starts right after G9
     ("SET PIECES", 105.0, 110.0, "N/A", "Throw-in"),       # [2625, 2750): overlaps G10
+]
+
+# tag_gaps.py fixture: (code, start_frame, end_frame, team, type). Times are written as
+# frame / 25 s, so round(s * 25) gives the frame back exactly. See fixtures/README.md (T1-T10).
+TAG_FRAMES = [
+    ("SET PIECES", 905, 1000, "Team B", "Goal Kick"),          # T1 links G5, no overlap
+    ("Set Pieces", 560, 600, "N/A", "Throw-in"),               # T2 links G4
+    ("SET PIECES", 2100, 2200, "Team A", "Corner Kick"),       # T3 links G9
+    ("set pieces", 1250, 1300, "Team A", "Free Kick"),         # T4 control
+    ("SET PIECES", 25, 75, "N/A", "Kick Off (Start)"),         # T5 ungraded anchor
+    ("PROGRESSION", 680, 800, "Team A", None),                 # T6 overlaps G5
+    ("Long Ball", 1490, 1650, "Team B", None),                 # T7 crosses halftime
+    ("BUILD UP", 1835, 1900, "Team B", None),                  # T8 links G8
+    ("SET PIECES", 2660, 2700, "N/A", "Throw-in"),             # T9 links G10, G11
+    ("GOALS", 2300, 2400, "Team A", None),                     # T10 control
 ]
 
 
@@ -217,9 +234,9 @@ def metadata_xml():
            player_channels="\n".join(player_channels), refs="\n".join(refs))
 
 
-def smart_tagging_xml():
+def smart_tagging_xml(tags=None):
     instances = []
-    for i, (code, start, end, team, kind) in enumerate(TAGS, 1):
+    for i, (code, start, end, team, kind) in enumerate(TAGS if tags is None else tags, 1):
         half = "1st Half" if start * FPS < 1550 else "2nd Half"
         labels = [("Team", team), ("Half", half)] + ([("Type", kind)] if kind else [])
         instances.append(
@@ -331,6 +348,9 @@ def main():
                 gz.write((frame_line(video_frame) + "\n").encode("ascii"))
     with open(os.path.join(OUT, "fixture_smart_tagging.xml"), "w") as handle:
         handle.write(smart_tagging_xml())
+    with open(os.path.join(OUT, "fixture_tags.xml"), "w") as handle:
+        handle.write(smart_tagging_xml([(c, a / float(FPS), b / float(FPS), t, k)
+                                        for c, a, b, t, k in TAG_FRAMES]))
     for name in sorted(os.listdir(OUT)):
         print("{:<28} {:>8} bytes".format(name, os.path.getsize(os.path.join(OUT, name))))
 

@@ -1,9 +1,10 @@
 # EDA hand-off: ball-track gaps
 
-**For a Claude chat that helps interpret VM results it must never see.** This file contains no
-competition data and nothing derived from it. Numbers here come from synthetic fixtures or
-Metrica's open Sample Game 3. Do not ask the user for VM outputs, counts or tables. Ask for their
-own-words, qualitative answers to section 7.
+**For a Claude chat that helps interpret the VM results.** The team allows an AI to see the
+outputs: the summary CSVs, the long-gap samples and the run notebook `eda_vm.ipynb` (or its
+`eda_vm.pdf` render). Never ask for or load a whole raw match file. This file itself contains no
+competition data: numbers here come from synthetic fixtures or Metrica's open Sample Game 3.
+Section 7 lists the questions the results should answer.
 
 Context: label every video frame H, A or D; ranked on spellF1. Carrying the previous label
 through a ball gap is free inside a possession and costly across a change of possession. The
@@ -67,13 +68,13 @@ spec with no `endFrame` is treated as open-ended.
 
 ### `sample_long_gaps.py` (video-review helper)
 
-It picks a few long gaps to watch by hand. **Its CSV is frame-indexed and stays on the VM; do not
-ask for it.** Gaps come from `ball_gaps.find_gaps`, minus edge gaps. A gap is eligible if
+It picks a few long gaps to watch by hand. Its CSV is frame-indexed: it may be shared for
+interpretation but is never committed. Gaps come from `ball_gaps.find_gaps`, minus edge gaps. A gap is eligible if
 length ≥ the q-quantile (default 0.9) of those lengths, or, with `--min-s`/`--max-s`,
 min ≤ s < max. Gaps overlapping `--exclude` ranges are dropped; by default these are the public
 GT window and the second-half frames before kickoff. The n gaps (default 8) are spread over the
 halves as evenly as the eligible gaps allow, with `default_rng(seed)`. The user records a
-category per gap while watching. Only their own-words summary of those categories comes back.
+category and notes per gap while watching.
 
 ## 3. Output
 
@@ -123,7 +124,8 @@ Printed lines, in order:
 
 ## 5. What was tested
 
-These are not competition results. 53 pytest tests pass. Expected values were derived by hand
+These are not competition results. 109 pytest tests pass (`tag_gaps.py` is covered in
+section 9). Expected values were derived by hand
 before the code (`tests/fixtures/README.md`), and every one matched.
 
 - **(a)-(c), main fixture** (3,000 frames, 46 slots): 11 gaps, 633 / 2,700 missing; bins
@@ -177,7 +179,7 @@ uncorrected tracking.
   reference, means we need a guess or a team-shape signal through those gaps. If R = 5 changes
   the picture, "nearest" is often not "in control".
 
-## 7. Questions for the user (qualitative only; no numbers or counts)
+## 7. Questions the results should answer
 
 1. Did line 1 show the published graded-frame count with no "no tracking record" note? Did
    `check_channels` declare any status or owner channel?
@@ -192,18 +194,133 @@ uncorrected tracking.
 8. Watching the sampled long gaps: what did they mostly look like (ball out of play, occlusion
    in a crowd, high ball, other)? Was that different between halves?
 
-## 8. Moving `eda/` into the team repo
+## 8. Where `eda/` lives
 
-Copy the whole folder: scripts, both `.md` files, `.gitignore`, `tests/` and the synthetic
-`tests/fixtures/` (about 490 KB). Leave out caches, output folders (`~/eda_out`), venvs, sample
-data and anything from the VM. The scripts refuse to write inside the repo, and `.gitignore`
-covers `out/`, `eda_out/`, `*_out/`, `*.csv` (except fixtures) and caches. The tests need numpy
-and pytest, not kloppy.
-
-```bash
-rsync -a --exclude '__pycache__' --exclude '.pytest_cache' --exclude '.Rhistory' eda/ /path/to/team-repo/eda/
-```
+`eda/` is in the team repository and runs from a clone on the VM (`eda/README.md`). Commit
+scripts, both `.md` files, `.gitignore`, `tests/`, the synthetic `tests/fixtures/` and the
+notebook with its renders. Never commit caches, output folders (`~/eda_out`), venvs, sample data
+or raw match data. The scripts refuse to write inside the repo, and `.gitignore` covers `out/`,
+`eda_out/`, `*_out/`, `*.csv` (except fixtures) and caches. The tests need numpy and pytest, not
+kloppy.
 
 ```bash
-cd /path/to/team-repo/eda && python -m pytest -q -p no:cacheprovider tests
+cd eda && python -m pytest -q -p no:cacheprovider tests
 ```
+
+## 9. `tag_gaps.py`: gaps vs Smart Tagging codes
+
+**Goal:** a dead-ball (`D`) rule without dead-ball labels. Smart Tagging is Metrica's automatic
+output (638 instances, 15 codes; no PENALTY code). Restarts are `SET PIECES`, split by the `Type`
+label: Throw-in, Corner Kick, Goal Kick, Free Kick, Kick Off (After Goal) and Kick Off (Start).
+It is a noisy proxy, not truth. A tag is a phase that most likely **starts at the restart**, so
+the dead stretch should sit just before a set piece's start. That is why the views measure lag to
+the start, not only overlap.
+
+**Definitions** (gaps as in section 2):
+
+- **Groups.** Codes are stripped and upper-cased. There is one group per code
+  (`code:<CODE>`), plus one per set-piece `Type` (`type:<Type>`).
+- **Anchor.** A tag's start frame (end frame for end-aligned profiles). A tag whose anchor is
+  not graded is dropped and counted in `n_dropped`.
+- **Linkable gap.** A gap whose reappearance (`next_seen`) is a graded frame of its own half.
+  Unlinkable gaps stay in the denominators.
+- **Link.** A gap links to a group if some anchor of the group in the same half has
+  |next_seen − anchor| ≤ W (W = 5 s).
+- **Overlap.** As in (b): tag `[a − tol, b + tol)` meets gap `[s, e]`.
+- **A. Profile.** Bins `[t + kB, t + (k+1)B)` for B = 1 s, from −30 s to +30 s. Only graded frames
+  in the anchor's own half count. Share = missing frames ÷ counted frames, pooled over the
+  group's instances.
+- **B. Strata.** Clipped gap length in s, half-open: `[0,2) [2,5) [5,10) [10,20) [20,35)
+  [35,∞)`, plus `all`.
+- **C. Threshold curve.** Long = length ≥ L.
+  - **Precision:** long gaps that link to the group ÷ long gaps.
+  - **Recall:** graded anchors with at least one long gap linked ÷ graded anchors.
+  - **Frame share:** frames in long gaps ÷ graded frames.
+  - Each gap and each anchor counts once. Per-`Type` precision counts only links to that type.
+- **Null (A, B).** Each half's anchors (A) or intervals (B) are shifted together, circularly
+  within the half, by an offset drawn uniformly from [60 s, L − 60 s], as in (e). Profile
+  windows are clipped to the half, not wrapped. K = 1000 shifts give the null mean, p5 and p95,
+  plus p_emp = (1 + #null ≥ real) / (1 + K) and lift = real ÷ null mean (B). With offset 0 the
+  null equals the observed values.
+
+| threshold | justification | status |
+|---|---|---|
+| window ±30 s, bin 1 s (A) | Long enough to see a full stoppage before a restart; 1 s matches the tag precision | choice |
+| W = 5 s link | Tag start ~ restart, plus about 1 s tag precision and the time to re-acquire the ball | arbitrary first choice; 2 s is the sensitivity run |
+| strata up to 35 s | The same bands as the long-gap video sample | choice |
+| min 5 gaps per heatmap cell | Below that, a share is mostly noise | arbitrary |
+
+**Printed lines:**
+
+1. Totals: graded frames, missing frames and share, gaps, unlinkable gaps.
+2. Tags: instances, codes, set-piece types, and the number of ungraded anchors. A note follows
+   if the null was skipped.
+3. A: the top 5 groups by P(missing) in the 10 s before a start (observed / null mean).
+4. B: the top 5 link lifts among bands with at least 5 gaps (count, lift, p_emp). Then SET PIECES
+   over all gaps: overlap vs link, with the link null mean.
+5. C: SET PIECES precision / recall / frame share at L = 2, 5, 10, 20 and 30 s.
+
+Without a tags file, line 2 is `no Smart Tagging file: views A-C skipped`.
+
+**`tag_gaps_summary.csv`** has the same columns as section 3:
+
+| analysis / scope / bin | metrics (unit) |
+|---|---|
+| `params` / `all`, `half h` | fps, window, bin, link_window, tag_tolerance (s), null_n, null_seed, null_min_shift (s), first/last_frame |
+| `overview` / `all` | graded_frames, missing_frames (frames), baseline_missing_share (fraction), n_gaps, n_unlinkable |
+| `tags` / group | n_tags, n_dropped |
+| `profile_start`, `profile_end` / group / bin left edge in s (`""` for the count) | n_instances; share, null_mean, null_p5, null_p95 (fraction 0-1; empty where nothing was counted); missing, counted (frames) |
+| `link`, `overlap` / group / stratum or `all` | n_gaps, real_count, real_share, null_mean, null_p5, null_p95 (fraction), p_emp, lift (ratio) |
+| `threshold` / `all` / L in s | n_long, frame_share |
+| `threshold` / group / L in s | linked, precision, anchors, anchors_hit, recall |
+
+**Notebook section 4** draws:
+- A as small multiples: an observed line over the grey null band, with the baseline dotted;
+- B as two heatmaps (link and overlap), coloured by log2 lift, with counts in the cells and `*`
+  where p_emp < 0.05;
+- C as precision, recall and frame-share curves against L on a log axis, one line per `Type`.
+
+**Assumptions and limitations:**
+
+- **Dead ≠ missing.** The ball can be dead while tracked (out of play but visible) and missing
+  while live (occlusion). This view only sees the overlap of the two.
+- **Agreement is not truth.** Precision and recall measure agreement with an automatic tagger
+  that has its own false positives and negatives. They are not dead-ball accuracy.
+- **Not tuned on the GT.** The public GT window is not used here (RULES.md: not for tuning).
+- **Kick-offs.** Kick Off (Start) anchors usually fall at a half start. The pre-kickoff frames of
+  half 2 are graded, so such gaps are clipped and edge-affected.
+- **Pooled shares** weight instances by their counted frames. A group with one or two instances
+  is anecdotal whatever its band says.
+
+**What was tested** (synthetic `fixture_tags.xml` on the main fixture; 53 tests, all values
+derived by hand first):
+- Set pieces overlap 0 of 11 gaps but link to 5 of 11. That is the case where overlap misses
+  the restart relation.
+- A BUILD UP tag that links, a tag that crosses halftime, an ungraded Kick Off, and mixed-case
+  codes.
+- Throw-in start profile 1.0 / 0.6 / 0.0 / 0.04 in bins −2…+1 s.
+- SET PIECES threshold curve: precision 0.45 / 0.8 / 1.0 and recall 0.8 / 0.8 / 0.4 at
+  L = 0 / 2 / 5 s.
+- The vectorised profile and link nulls equal slow per-shift loops, and offset 0 equals the
+  observed values.
+- On Sample Game 3 (no tags), the script runs in 0.2 s and skips views A-C.
+
+**Decisions it informs:**
+
+- **A:** which `Type`s carry a pre-start missing-ball signature, and how long it lasts. That
+  gives a per-type look-back window for marking `D` before a restart.
+- **B:** which codes, beyond SET PIECES, go with long gaps (e.g. GOALS, or attacking phases
+  that end out of play), and whether short gaps are tag-neutral (occlusion) as expected.
+- **C:** a candidate L per `Type`, where precision levels off while recall is still useful, and
+  what share of frames that rule would mark `D`.
+
+**Questions the results should answer:**
+
+1. In A, which `Type`s show P(missing) clearly above the null band before the start? Roughly
+   how many seconds before? Is any code high *after* its start?
+2. Are throw-ins different from goal kicks, corners and kick-offs (shorter or weaker run-up)?
+3. In B, is the restart link above chance mainly for long bands? Do short gaps look like the
+   null? Which non-set-piece codes stand out?
+4. Did `--link-window 2` or `--tag-tolerance 1` change the picture?
+5. In C, at which L does SET PIECES precision level off, and what are recall and the frame share
+   there? Does the "≥ 20 s and set piece" idea hold for every `Type`, or only some?
