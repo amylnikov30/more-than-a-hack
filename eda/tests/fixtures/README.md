@@ -154,3 +154,67 @@ out of range. With the 5 m cap, (2,5) and (5,8) are also dropped: n = 5, 2 flips
   [4200, 4300) and [4700, 4800). Per-gap hit probability under a shift is about
   10 x 149 / 5000 = 0.3, so P(null >= 1 of 5) is about 1 - 0.7^5 = 0.83. Expected p_emp is
   about 0.8 (assert > 0.5).
+
+# `sample_long_gaps.py`: long-gap sampler
+
+Main fixture, `--frames 100-1499,1600-2899`. Gaps come from `ball_gaps.find_gaps`. Edge gaps
+(G6, G7) are dropped because their true length is unknown. That leaves **9 gaps**, with these
+lengths in frames: G11 2, G1 5, G2 12, G3 13, G8 31, G4 50, G9 100, G10 150, G5 200.
+
+**Rules (decided before coding)**
+
+- Without `--min-s`/`--max-s`, the threshold is `np.quantile(lengths, q)` (linear) over the 9
+  gaps, and a gap is eligible if `length >= threshold`.
+- With them, a gap is eligible if `min_s * 25 <= length < max_s * 25`: half-open, like the
+  `ball_gaps` bins. A missing bound is 0 or infinity.
+- `--exclude a-b,...` drops a gap that shares at least one frame with an inclusive range.
+- The sample size is k = min(n, eligible). Quotas per half are filled one gap at a time: the
+  next gap goes to the half with the smallest quota that still has unused eligible gaps, with
+  ties going to the lower half number. Within a half, `default_rng(seed).choice` picks gaps
+  without replacement, halves in order. Rows are sorted by start frame.
+- Columns: `half, start_frame, end_frame, gap_s, view_from, view_to, category, notes`.
+  `view_from = ts(max(0, start - 75))`, `view_to = ts(end + 75)`, `ts(f) = h:mm:ss.ss` of f / 25.
+
+**Expected**
+
+| case | threshold / range | eligible (half 1 / half 2) | n | rows per half |
+|---|---|---|---|---|
+| q 0.9 | 0.9 x 8 = 7.2 -> 150 + 0.2 x 50 = 160 fr (6.4 s) | G5 (1 / 0) | 8 | 1 / 0 |
+| q 0.5 | position 4 -> 31 fr (1.24 s) | G4, G5 / G8, G9, G10 (2 / 3) | 8 | 2 / 3 (all 5) |
+| q 0.5 | same | same | 3 | 2 / 1 (old code: 4 rows) |
+| q 0.5 | same | same | 4 | 2 / 2 |
+| q 0.5, `--exclude 450-920` | same threshold; G4, G5 excluded | 0 / 3 | 2 | 0 / 2 (old code: 1) |
+| `--min-s 2 --max-s 6` | [50, 150) fr | G4 / G9 (G10 = 6.00 s exactly is out) | 8 | 1 / 1 |
+| `--min-s 2` | [50, inf) | G4, G5 / G9, G10 | 8 | 2 / 2 |
+| `--min-s 10` | [250, inf) | none | 8 | 0 rows: header-only CSV, no crash |
+
+G5's row: `half 1, start 700, end 899, gap_s 8.0, view_from 0:00:25.00` (frame 625),
+`view_to 0:00:38.96` (frame 974).
+
+The same seed gives a byte-identical CSV. An output folder inside the repo is refused
+(`SystemExit`).
+
+**Records missing from the file.** In a 10-line raw file (frame_id 1..10, graded `0-9`), the
+ball is NaN on frame_id 4-5 and the line for frame_id 8 is absent. The gaps are video 3-4
+(length 2) and video 7 (length 1). They are separate, and video 7 counts as missing.
+
+# `ball_gaps.py` robustness fixes
+
+- **Spec without `endFrame`** (or `startFrame`): treated as open-ended (`startFrame` 0,
+  `endFrame` infinite). With `endFrame="200"` removed from `fixture_flip_atd.xml`, the teams for
+  video frame 150 and for video frame 10**6 are both `[0, 1, 0, 1, -1, 0]`. Before the fix,
+  `teams_for` returned `None`, so every gap became `no_player`. The flip analysis on that file
+  matches the original: 8 gaps, 5 evaluable, 2 flips.
+- **`--game` reaches every path lookup.** With a stand-in `games` module, `main([OUT, "--game",
+  "XX"])` calls `require` only with `game="XX"`, and `half_video_blocks` with `"XX"`.
+- **Smart Tagging is optional in games mode.** If the stand-in `require(["smart_tagging"])`
+  raises `IOError`, the run still finishes on the main fixture (`atd_raw` = `fixture_atd.txt.gz`,
+  `atd_meta` = `fixture_atd.xml`, blocks `100-1499,1600-2899`) with `set_pieces` and
+  `set_pieces_null` both `None`, 11 gaps, and a stdout note that the tags file is missing. If
+  `atd_raw` or `atd_meta` is missing, it still exits (`SystemExit`).
+- **The refusal message names the calling script's folder:** `ball_gaps.py` suggests
+  `~/eda_out/ball_gaps`, and `sample_long_gaps.py` suggests `~/eda_out/long_gaps`.
+
+**`--csv-name`.** `--min-s 2 --csv-name gap_test.csv` writes `OUT/gap_test.csv`, with the same 4
+rows as `--min-s 2`, and no `long_gap_sample.csv`. A name containing a path separator
+(`sub/x.csv`) or not ending in `.csv` is a usage error (`SystemExit`).

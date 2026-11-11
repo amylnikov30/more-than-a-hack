@@ -62,6 +62,19 @@ ungraded or absent.
 | K = 1000, null seed 0 (e) | p_emp resolution 0.001 | choice |
 | min_shift 60 s (e) | Keeps shifted tags away from their true place without excluding much of a 53-min half | arbitrary |
 
+Without `--raw`, a missing Smart Tagging file prints a note and skips (b) and (e). A metadata
+spec with no `endFrame` is treated as open-ended.
+
+### `sample_long_gaps.py` (video-review helper)
+
+It picks a few long gaps to watch by hand. **Its CSV is frame-indexed and stays on the VM; do not
+ask for it.** Gaps come from `ball_gaps.find_gaps`, minus edge gaps. A gap is eligible if
+length ≥ the q-quantile (default 0.9) of those lengths, or, with `--min-s`/`--max-s`,
+min ≤ s < max. Gaps overlapping `--exclude` ranges are dropped; by default these are the public
+GT window and the second-half frames before kickoff. The n gaps (default 8) are spread over the
+halves as evenly as the eligible gaps allow, with `default_rng(seed)`. The user records a
+category per gap while watching. Only their own-words summary of those categories comes back.
+
 ## 3. Output
 
 Printed lines, in order:
@@ -110,7 +123,7 @@ Printed lines, in order:
 
 ## 5. What was tested
 
-These are not competition results. 35 pytest tests pass. Expected values were derived by hand
+These are not competition results. 53 pytest tests pass. Expected values were derived by hand
 before the code (`tests/fixtures/README.md`), and every one matched.
 
 - **(a)-(c), main fixture** (3,000 frames, 46 slots): 11 gaps, 633 / 2,700 missing; bins
@@ -127,6 +140,13 @@ before the code (`tests/fixtures/README.md`), and every one matched.
   block 200-299 gives [290,300) and [200,205). Tags never cross halves, and the same seed gives
   identical statistics. Tags placed on the gaps give real 100%, null mean 8.1%,
   p_emp = 1/1001. Independently placed tags give real 20%, null mean 28.4%, p_emp 0.79.
+- **Sampler:** on the main fixture, 9 of 11 gaps are not edge gaps. Thresholds are q 0.9 →
+  160 frames and q 0.5 → 31. `[2, 6)` s keeps a gap of exactly 6.00 s out. `--n 3` gives 2 + 1
+  rows, one half is filled when the other has none, an empty selection writes only a header,
+  and the same seed gives byte-identical output. A frame with no record splits gaps instead of
+  merging them.
+- **Robustness:** a spec with no `endFrame` gives the same teams and flips. `--game` reaches every
+  path lookup. A missing tags file skips (b) and (e) without stopping the run.
 
 **Metrica open Sample Game 3 (NOT the competition match).** It has no Smart Tagging file, so
 (b) and (e) are skipped, and it is graded whole. (a) and (c): 161 gaps, and ≥ 5 s gaps hold 96.9%
@@ -169,6 +189,8 @@ uncorrected tracking.
 6. Was the real set-piece overlap inside, above or below the null band? Did ±1 s change that? Was
    it different for 2-5 s and ≥ 5 s?
 7. Are gap starts more, equally or less crowded than visible frames?
+8. Watching the sampled long gaps: what did they mostly look like (ball out of play, occlusion
+   in a crowd, high ball, other)? Was that different between halves?
 
 ## 8. Moving `eda/` into the team repo
 

@@ -144,7 +144,10 @@ def read_slot_teams(meta_path):
                 pid = channel_player.get(refs[0]) if refs else None
                 teams.append(player_team.get(pid, -1))
             break
-        specs.append((int(spec.get("startFrame", 0)), int(spec.get("endFrame", 0)),
+        # A missing bound means open-ended; defaulting endFrame to 0 would match no frame and
+        # silently turn every gap into "no_player".
+        end = spec.get("endFrame")
+        specs.append((int(spec.get("startFrame") or 0), int(end) if end else math.inf,
                       np.array(teams, dtype=int)))
     return specs
 
@@ -448,7 +451,7 @@ def analyse(raw_path, blocks, tags_path=None, fps=FPS, pitch=PITCH, radius=RADIU
         if lengths:
             deltas[label] = int(round(float(np.median(lengths))))
 
-    starts = [g for g in gaps if g["last_seen"] is not None and has_record[g["last_seen"]]]
+    starts = [g for g in gaps if g["last_seen"] is not None]
     wanted = set(int(g["last_seen"]) for g in starts) | set(sample.tolist())
     if meta_path:
         wanted |= set(int(g["next_seen"]) for g in gaps if g["next_seen"] is not None)
@@ -759,13 +762,13 @@ def repo_root(start=None):
         d = parent
 
 
-def check_out_dir(out_dir):
+def check_out_dir(out_dir, example="~/eda_out/ball_gaps"):
     """Exit if out_dir is inside the repository holding this script: outputs never go in-repo."""
     root = os.path.realpath(repo_root())
     target = os.path.realpath(os.path.abspath(out_dir))
     if target == root or target.startswith(root + os.sep):
         sys.exit("refusing to write into {} (inside the repo {}); pass a folder outside it, "
-                 "e.g. ~/eda_out/ball_gaps".format(target, root))
+                 "e.g. {}".format(target, root, example))
 
 
 def parse_frames(text):
@@ -828,11 +831,17 @@ def main(argv=None):
     else:
         games = _games()
         try:
-            raw, meta = games.require(["atd_raw", "atd_meta"])
-            meta = args.meta or meta
-            tags = args.tags or games.require(["smart_tagging"])[0]
-        except (IOError, OSError) as err:
+            raw, meta = games.require(["atd_raw", "atd_meta"], game=args.game)
+        except (IOError, OSError, KeyError) as err:
             sys.exit(str(err))
+        meta = args.meta or meta
+        tags = args.tags
+        if not tags:
+            try:
+                tags = games.require(["smart_tagging"], game=args.game)[0]
+            except (IOError, OSError, KeyError):
+                print("note: Smart Tagging file not found; (b) and (e) skipped")
+                tags = None
         blocks = args.frames or games.half_video_blocks(args.game)
 
     res = analyse(raw, blocks, tags, fps=args.fps, pitch=tuple(args.pitch), radius=args.radius,
