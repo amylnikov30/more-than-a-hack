@@ -109,3 +109,57 @@ def test_main_writes_csv(tmp_path, capsys):
     with pytest.raises(SystemExit):
         su.main([os.path.join(FIXTURES, "x"), "--raw", RAW, "--frames", "0-11"])
     assert np.isfinite(float(v[("ratio", "players", "n_pairs")]))
+
+
+# ---------------------------------------------------------------- additions (fixture_disp_atd)
+
+DISP = os.path.join(FIXTURES, "fixture_disp_atd.txt")
+DISP_BLOCKS = [(1, 0, 69)]
+
+
+@pytest.fixture(scope="module")
+def disp_res():
+    return su.analyse(DISP, DISP_BLOCKS, disp_window_s=0.2)
+
+
+def test_ball_declared(disp_res):
+    assert disp_res["declared_ball"] == {"nan": 2, "zero": 10, "positive": 38}
+
+
+def test_ratio_by_speed(disp_res):
+    ball = disp_res["classes"]["ball"]["by_band"]
+    for band in ("2-5", "10-20", "20+"):
+        med, p25, p75, n = ball[band]
+        assert n == 9 and (med, p25, p75) == (A(3.6), A(3.6), A(3.6)), band
+    for band in ("0-2", "5-10"):
+        assert ball[band][3] == 0 and np.isnan(ball[band][0])
+    players = disp_res["classes"]["players"]["by_band"]
+    assert players["5-10"][3] == 69 and players["5-10"][0] == A(3.6)
+    assert sum(v[3] for v in players.values()) == 69
+    assert disp_res["classes"]["ball"]["n_ratio"] == 27
+
+
+def test_ball_disp(disp_res):
+    d = disp_res["disp"]
+    assert d["n"] == 25 and d["window_frames"] == 5
+    assert dict(d["bands"]) == {"0-0.1": 5, "0.1-0.25": 5, "0.25-0.5": 0, "0.5-1": 5,
+                                "1-2": 0, "2-5": 5, "5+": 5}
+    rows = {(a, s, b, m): v for a, s, b, m, v, _ in su.summary_rows(disp_res)}
+    assert rows[("ball_disp", "ball", "2-5", "share")] == A(0.2)
+    assert rows[("ball_disp", "ball", "1-2", "share")] == 0
+
+
+def test_original_fixture_disp_empty(res):
+    assert res["disp"]["n"] == 0
+    rows = {(a, s, b, m): v for a, s, b, m, v, _ in su.summary_rows(res)}
+    assert np.isnan(rows[("ball_disp", "ball", "0-0.1", "share")])
+    assert rows[("ball_declared", "ball", "positive", "n_frames")] == 10
+
+
+def test_ball_cap_alias(tmp_path):
+    out = tmp_path / "out"
+    r = su.main([str(out), "--raw", DISP, "--frames", "0-69", "--ball-cap-ms", "30",
+                 "--disp-window-s", "0.2"])
+    assert r["caps"]["ball"] == 30
+    assert r["classes"]["ball"]["n_over_cap"] == 9          # B5 at 34 m/s
+    assert r["classes"]["ball"]["by_band"]["20+"][3] == 0

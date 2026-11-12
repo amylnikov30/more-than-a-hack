@@ -622,3 +622,55 @@ moves on step 300 and 350, so 300 and 350 are 0.25.
 **Reproduction.** On the main fixture with `fixture_tags.xml`, `signal_profiles` for
 `ball_missing` equals `tag_gaps.view_a` (observed, and null with the same offsets) for every
 SET PIECES group, starts and ends.
+
+## `speed_units.py` additions: declared ball speed, ratio by speed band, ball displacement
+
+`fixture_disp_atd.txt` (70 lines, frame_id 1..70), graded `--frames 0-69` (one half), pitch
+105.3 x 68.0 m. One player slot moves along y by 0.004 per frame (0.272 m, 6.8 m/s, declared
+24.48 = 6.8 x 3.6). The ball sits at x 0.5 and moves along y in five 10-frame segments separated
+by 5-frame gaps (ball NaN), so no window or step crosses a segment:
+
+| segment | frames | y step / frame | metres / frame | speed | declared |
+|---|---|---|---|---|---|
+| B1 | 0-9 | 0 | 0 | 0 m/s | 0.00 |
+| B2 | 15-24 | 0.0005 | 0.034 | 0.85 m/s | 3.06, but NaN on 15 and 16 |
+| B3 | 30-39 | 0.002 | 0.136 | 3.4 m/s | 12.24 |
+| B4 | 45-54 | 0.01 | 0.68 | 17 m/s | 61.2 |
+| B5 | 60-69 | 0.02 | 1.36 | 34 m/s | 122.4 |
+
+Ball NaN on 10-14, 25-29, 40-44, 55-59.
+
+## Rules (decided before coding)
+
+- `--ball-cap-ms` is another name for `--cap-ball` (default 40 m/s): the ball's plausibility
+  cap, used instead of the player cap. Existing rows do not change.
+- **ball_declared**: on graded frames where the ball's x and y are present, the declared speed
+  field is `nan` (missing or NaN), `zero` (exactly 0) or `positive` (> 0). Negative values are
+  counted in none of the three (none are expected).
+- **ratio_by_speed**: the pairs that enter the main ratio (derived speed in `[--min-ms, cap]`,
+  declared finite), grouped by derived speed in half-open bands `[0,2) [2,5) [5,10) [10,20)
+  [20,inf)` m/s; per band `median`, `p25`, `p75` (NaN when empty) and `n_ratio`. With the
+  default floor of 1 m/s, band `0-2` holds only `[1, 2)`.
+- **ball_disp**: for every graded frame f with f - w graded in the same half and the ball
+  present on both (w = round(`--disp-window-s` x fps), default 25), the ball's displacement in
+  metres between f - w and f, in half-open bands `[0,0.1) [0.1,0.25) [0.25,0.5) [0.5,1) [1,2)
+  [2,5) [5,inf)` m; per band `share` of all such windows, plus `n_frames` (an extra metric for
+  the n annotations).
+
+## Expected
+
+**ball_declared**: 50 visible frames: `nan` 2 (15, 16), `zero` 10 (B1), `positive` 38.
+
+**ratio_by_speed** (default floor 1 m/s). Ball pairs inside segments: 9 per segment. B1 (0 m/s)
+and B2 (0.85 m/s) are below the floor. B3: 9 pairs in `2-5`; B4: 9 in `10-20`; B5: 9 in `20+`
+(34 m/s is under the 40 m/s cap); each ratio 3.6, so median = p25 = p75 = 3.6. Bands `0-2` and
+`5-10`: n_ratio 0, quartiles NaN. Players: 69 pairs, all in `5-10`, ratio 3.6.
+
+**ball_disp** with `--disp-window-s 0.2` (w = 5): 5 windows per segment (f = start + 5 ... end).
+B1 0 m -> `0-0.1`; B2 5 x 0.034 = 0.17 m -> `0.1-0.25`; B3 0.68 m -> `0.5-1`; B4 3.4 m ->
+`2-5`; B5 6.8 m -> `5+`. 25 windows: share 0.2 in each of those five bands, 0 in `0.25-0.5` and
+`1-2`.
+
+**Unchanged.** On `fixture_speed_atd.*` every existing row is identical, and with the default
+1 s window (25 frames) there are no displacement windows (12 frames): every share is NaN and
+`n_frames` 0.

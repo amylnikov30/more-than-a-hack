@@ -120,8 +120,12 @@ cd ~/more-than-a-hack && PYTHONPATH="$PWD" python3 eda/tag_gaps.py "$HOME/eda_ou
 
 ### Dead-ball EDA (read by the three dead-ball notebooks)
 
-Speed units (`speed_units.py`, read by `eda_extras.ipynb`). It streams the whole raw file once
-and reads the declared unit from the ATD metadata:
+Speed units (`speed_units.py`, read by `eda_extras.ipynb` sections 1 and 2, including the
+ball-diagnostics cell under the section 1 chart: declared ball speed, ratio by speed band and
+1 s ball displacement). It streams the whole raw file once and reads the declared unit from the
+ATD metadata. Those diagnostics need a run with the current version (rows `ball_declared`,
+`ratio_by_speed`, `ball_disp`); keep the default `--disp-window-s 1`, which the cell's labels
+assume:
 
 ```bash
 cd ~/more-than-a-hack && PYTHONPATH="$PWD" python3 eda/speed_units.py "$HOME/eda_out/speed_units"
@@ -243,7 +247,9 @@ declared speed`.
 
 `--raw`, `--meta` (for the declared unit; default `games.asset_paths()['atd_meta']` without
 `--raw`), `--frames`, `--game`, `--fps`, `--pitch L W` (m, default 105.3 68.0), `--min-ms`
-(ratio floor, m/s, default 1), `--cap-player` (m/s, default 12), `--cap-ball` (m/s, default 40).
+(ratio floor, m/s, default 1), `--cap-player` (m/s, default 12), `--cap-ball` or
+`--ball-cap-ms` (the same option: the ball's cap, used instead of the player cap; m/s, default
+40), `--disp-window-s` (ball displacement window, s, default 1).
 
 ## Options (`ball_outside.py`)
 
@@ -355,12 +361,31 @@ verdict needs players and ball to agree (`conflict` otherwise).
 | speed | players / ball | p50 / p99 / p99.9 | derived (m/s), declared (declared unit); n_declared | |
 | verdict | players / ball / overall | | verdict (text) | |
 
+Rows added later (after all the rows above, which are unchanged):
+
+| analysis | scope | bin | metric | unit |
+|---|---|---|---|---|
+| params | all | | disp_window | s |
+| ball_declared | ball | `nan` / `zero` / `positive` | n_frames | frames |
+| ratio_by_speed | players / ball | `0-2` `2-5` `5-10` `10-20` `20+` (m/s) | median, p25, p75, n_ratio | ratio, count |
+| ball_disp | ball | `0-0.1` `0.1-0.25` `0.25-0.5` `0.5-1` `1-2` `2-5` `5+` (m) | share, n_frames | share of windows, frames |
+
+`ball_declared` counts graded frames with the ball's position present by their declared speed
+field (missing/NaN, exactly 0, above 0). `ratio_by_speed` splits the pairs of the main ratio by
+derived speed (half-open bands; with the 1 m/s floor, `0-2` holds only 1-2 m/s); a ratio that
+drifts with speed means the declared speed is smoothed or capped. `ball_disp` is the ball's
+displacement between f - w and f (w = `--disp-window-s` x fps), on windows with the ball present
+at both ends and both frames graded in the same half: the share of windows under 0.1 or 0.25 m
+calibrates the stationary-ball threshold of `ball_stationary.py` (0.5 m/s over 0.2 s is 0.1 m).
+
 Derived percentiles use every pair with no cap, so slot swaps show up in the p99.9 tail; the
 `n_over_cap` row says how many there are.
 
 **Tests.** `tests/test_speed_units.py` on `fixture_speed_atd.*` (12 frames, declared in km/h
 while the metadata says m/s): pair counts, the swap over the cap, ratio quartiles, percentiles,
-the halftime step, a file without a speed field, a missing line.
+the halftime step, a file without a speed field, a missing line. On `fixture_disp_atd.txt`
+(70 frames, the ball in five isolated segments at 0 to 34 m/s): declared-ball counts, the ratio
+per speed band, the displacement bands and the `--ball-cap-ms` alias.
 
 **Questions for interpretation.**
 - Is the IQR of the ratio narrow? A wide IQR around 3.6 suggests the declared speed is smoothed
@@ -369,6 +394,12 @@ the halftime step, a file without a speed field, a missing line.
   computed differently (e.g. in 3D).
 - How many pairs exceed the cap? Many player swaps point to tracklet switches that a speed-based
   rule (clause d) must guard against.
+- Is the declared ball speed mostly NaN or zero on visible frames? Then the ball column is not
+  usable and only derived ball speed counts.
+- What share of 1 s windows moves the ball less than 0.1 m or 0.25 m? On Sample Game 3 it is
+  0.07% and 0.3%: the tracked ball is almost never still, which matches how few still runs
+  `ball_stationary.py` finds there. A much larger share on the match would leave room for a
+  stricter `--still-ms`.
 
 ### Ball outside the pitch (`ball_outside.py`, clause a)
 

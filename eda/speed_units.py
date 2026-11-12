@@ -9,6 +9,9 @@ frames of the same half (metres x fps), only where both positions are present. A
   speeds     p50 / p99 / p99.9 of the derived speed (all pairs, no cap) and of the declared speed
              (every graded frame with a present object), players and ball separately
   verdict    per class and overall, next to the unit the ATD metadata declares
+  extras     declared ball speed on visible-ball frames (NaN / zero / positive); the ratio by
+             derived-speed band; the distribution of ball displacement over --disp-window-s
+             (calibrates the stationary-ball definition)
 
 Usage
     # competition match: paths from games.asset_paths() (honours MTAH_DATA_DIR)
@@ -39,6 +42,12 @@ CAP_BALL_MS = 40.0       # a very hard shot
 QS = (50, 99, 99.9)
 UNITS = (("m/s", 1.0), ("km/h", 3.6))
 VERDICT_TOL = 0.10       # +-10% of the reference ratio
+DISP_WINDOW_S = 1.0      # ball displacement window for the stationary-ball calibration
+SPEED_BANDS = [(0.0, 2.0, "0-2"), (2.0, 5.0, "2-5"), (5.0, 10.0, "5-10"), (10.0, 20.0, "10-20"),
+               (20.0, math.inf, "20+")]               # m/s, half-open
+DISP_BANDS = [(0.0, 0.1, "0-0.1"), (0.1, 0.25, "0.1-0.25"), (0.25, 0.5, "0.25-0.5"),
+              (0.5, 1.0, "0.5-1"), (1.0, 2.0, "1-2"), (2.0, 5.0, "2-5"),
+              (5.0, math.inf, "5+")]                  # metres, half-open
 CSV_NAME = "speed_units_summary.csv"
 CLASSES = ("players", "ball")
 
@@ -71,8 +80,32 @@ def overall_verdict(per_class):
     return found[0] if all(v == found[0] for v in found) else "conflict"
 
 
+def band_counts(values, bands):
+    """[(label, n)] of values in each half-open band."""
+    return [(label, int(np.sum((values >= lo) & (values < hi)))) for lo, hi, label in bands]
+
+
+def ball_displacement(frames, xy, half_of, window, pitch=PITCH):
+    """Displacement (m) between f - window and f, for every f with both frames recorded, graded
+    in the same half and the ball present on both."""
+    if not len(frames):
+        return np.empty(0)
+    n = int(frames.max()) + 1
+    pos = np.full((n, 2), np.nan)
+    pos[frames] = xy
+    hv = np.zeros(n, dtype=int)
+    m = min(n, len(half_of))
+    hv[:m] = half_of[:m]
+    if window < 1 or n <= window:
+        return np.empty(0)
+    d = (pos[window:] - pos[:-window]) * np.asarray(pitch)
+    dist = np.hypot(d[:, 0], d[:, 1])
+    ok = (hv[window:] > 0) & (hv[window:] == hv[:-window]) & np.isfinite(dist)
+    return dist[ok]
+
+
 def analyse(raw_path, blocks, meta_path=None, fps=FPS, pitch=PITCH, min_ms=MIN_MS,
-            cap_player=CAP_PLAYER_MS, cap_ball=CAP_BALL_MS):
+            cap_player=CAP_PLAYER_MS, cap_ball=CAP_BALL_MS, disp_window_s=DISP_WINDOW_S):
     """All numbers, as a dict. No per-frame data leaves this function."""
     half_of = common.graded_half_of(blocks)
     caps = {"players": cap_player, "ball": cap_ball}
@@ -81,7 +114,19 @@ def analyse(raw_path, blocks, meta_path=None, fps=FPS, pitch=PITCH, min_ms=MIN_M
     decl_all = {c: [] for c in CLASSES}      # declared speed on every graded present frame
     skipped_steps = 0
     prev = None
+    declared_ball = {"nan": 0, "zero": 0, "positive": 0}
+    ball_frames, ball_xy = [], []
     for frame, players, ball in common.stream_frames(raw_path):
+        if common.half_at(half_of, frame) > 0 and np.isfinite(ball[:2]).all():
+            v = ball[2]
+            if not np.isfinite(v):
+                declared_ball["nan"] += 1
+            elif v == 0:
+                declared_ball["zero"] += 1
+            elif v > 0:
+                declared_ball["positive"] += 1
+            ball_frames.append(frame)
+            ball_xy.append(ball[:2])
         if common.half_at(half_of, frame) > 0:
             for c, arr in (("players", players), ("ball", ball[None, :])):
                 ok = np.isfinite(arr[:, :2]).all(axis=1) & np.isfinite(arr[:, 2])
@@ -102,7 +147,8 @@ def analyse(raw_path, blocks, meta_path=None, fps=FPS, pitch=PITCH, min_ms=MIN_M
 
     res = {"blocks": list(blocks), "fps": fps, "pitch": tuple(pitch), "min_ms": min_ms,
            "caps": caps, "skipped_steps": skipped_steps,
-           "declared_unit": declared_unit(meta_path), "classes": {}}
+           "declared_unit": declared_unit(meta_path), "classes": {},
+           "declared_ball": declared_ball, "disp_window_s": disp_window_s}
     for c in CLASSES:
         d = np.concatenate(derived[c]) if derived[c] else np.empty(0)
         s = np.concatenate(decl_pair[c]) if decl_pair[c] else np.empty(0)
@@ -111,12 +157,24 @@ def analyse(raw_path, blocks, meta_path=None, fps=FPS, pitch=PITCH, min_ms=MIN_M
         with np.errstate(divide="ignore", invalid="ignore"):
             ratio = s[use] / d[use]
         med, p25, p75 = (common.percentiles(ratio, (50, 25, 75)))
+        d_used = d[use]
+        by_band = {}
+        for lo, hi, label in SPEED_BANDS:
+            r = ratio[(d_used >= lo) & (d_used < hi)]
+            by_band[label] = common.percentiles(r, (50, 25, 75)) + [int(len(r))]
         res["classes"][c] = {
             "n_pairs": int(len(d)), "n_over_cap": int(np.sum(d > caps[c])),
             "n_ratio": int(len(ratio)), "ratio_median": med, "ratio_p25": p25, "ratio_p75": p75,
             "derived_q": common.percentiles(d, QS), "n_declared": int(len(s_all)),
-            "declared_q": common.percentiles(s_all, QS), "verdict": verdict(med)}
+            "declared_q": common.percentiles(s_all, QS), "verdict": verdict(med),
+            "by_band": by_band}
     res["verdict"] = overall_verdict([res["classes"][c]["verdict"] for c in CLASSES])
+    window = int(round(disp_window_s * fps))
+    disp = ball_displacement(np.asarray(ball_frames, dtype=np.int64),
+                             np.asarray(ball_xy, dtype=float).reshape(-1, 2), half_of, window,
+                             pitch)
+    res["disp"] = {"n": int(len(disp)), "window_frames": window,
+                   "bands": band_counts(disp, DISP_BANDS)}
     return res
 
 
@@ -148,6 +206,20 @@ def summary_rows(res):
             add("speed", c, "p{:g}".format(q), "declared", v, "declared unit")
         add("verdict", c, "", "verdict", r["verdict"] or "", "")
     add("verdict", "overall", "", "verdict", res["verdict"], "")
+    # additions (after every original row, so the original rows are unchanged)
+    add("params", "all", "", "disp_window", res["disp_window_s"], "s")
+    for k in ("nan", "zero", "positive"):
+        add("ball_declared", "ball", k, "n_frames", res["declared_ball"][k], "frames")
+    for c in CLASSES:
+        for label, (med, p25, p75, n) in res["classes"][c]["by_band"].items():
+            add("ratio_by_speed", c, label, "median", med, "ratio")
+            add("ratio_by_speed", c, label, "p25", p25, "ratio")
+            add("ratio_by_speed", c, label, "p75", p75, "ratio")
+            add("ratio_by_speed", c, label, "n_ratio", n, "count")
+    n = res["disp"]["n"]
+    for label, k in res["disp"]["bands"]:
+        add("ball_disp", "ball", label, "share", bg._rate(k, n), "share of windows")
+        add("ball_disp", "ball", label, "n_frames", k, "frames")
     return rows
 
 
@@ -165,6 +237,12 @@ def print_summary(res, csv_path):
         print("        derived m/s p50/p99/p99.9 {}; declared p50/p99/p99.9 {} (n={})".format(
             "/".join(_f(v) for v in r["derived_q"]), "/".join(_f(v) for v in r["declared_q"]),
             r["n_declared"]))
+    db = res["declared_ball"]
+    print("ball declared speed on visible frames: NaN {}, zero {}, positive {}; ball moves "
+          "< 0.25 m in {:g} s on {} of {} windows".format(
+              db["nan"], db["zero"], db["positive"], res["disp_window_s"],
+              sum(k for label, k in res["disp"]["bands"] if label in ("0-0.1", "0.1-0.25")),
+              res["disp"]["n"]))
     if res["skipped_steps"]:
         print("note: {} steps skipped for players (slot count changed)".format(
             res["skipped_steps"]))
@@ -192,8 +270,11 @@ def main(argv=None):
                    help="ratio only where derived speed >= this, m/s (default 1)")
     p.add_argument("--cap-player", type=float, default=CAP_PLAYER_MS,
                    help="player plausibility cap, m/s (default 12)")
-    p.add_argument("--cap-ball", type=float, default=CAP_BALL_MS,
-                   help="ball plausibility cap, m/s (default 40)")
+    p.add_argument("--cap-ball", "--ball-cap-ms", dest="cap_ball", type=float,
+                   default=CAP_BALL_MS, help="ball plausibility cap, m/s, used instead of the "
+                   "player cap (default 40)")
+    p.add_argument("--disp-window-s", type=float, default=DISP_WINDOW_S,
+                   help="ball displacement window, s (default 1)")
     args = p.parse_args(argv)
     bg.check_out_dir(args.out_dir, example="~/eda_out/speed_units")
     if args.raw:
@@ -205,7 +286,8 @@ def main(argv=None):
         raw, meta = paths["atd_raw"], args.meta or paths["atd_meta"]
         blocks = args.frames or bg._games().half_video_blocks(args.game)
     res = analyse(raw, blocks, meta, fps=args.fps, pitch=tuple(args.pitch), min_ms=args.min_ms,
-                  cap_player=args.cap_player, cap_ball=args.cap_ball)
+                  cap_player=args.cap_player, cap_ball=args.cap_ball,
+                  disp_window_s=args.disp_window_s)
     os.makedirs(args.out_dir, exist_ok=True)
     csv_path = os.path.join(args.out_dir, CSV_NAME)
     bg.write_csv(summary_rows(res), csv_path)

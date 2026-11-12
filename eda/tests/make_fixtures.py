@@ -18,6 +18,8 @@ Files written
                                tags, for ball_stationary.py
     fixture_signal_*           400 frames with known player speeds, ball gaps and a homography
                                CSV, for signal_profiles.py and gap_stoppage.py
+    fixture_disp_atd.txt       70 frames, ball in segments at known speeds, for the speed_units.py
+                               declared-ball, speed-band and displacement rows
     fixture_speed_atd.*        12 frames, 3 slots + ball, declared speed in km/h, for
                                speed_units.py
 
@@ -528,6 +530,28 @@ def signal_homography_csv():
     return "\n".join(lines) + "\n"
 
 
+# ---------------------------------------------------------------- disp fixture, speed_units.py extras
+# 70 frames: one player at 6.8 m/s, the ball in five isolated 10-frame segments at known speeds;
+# see fixtures/README.md ("speed_units.py additions").
+
+DISP_N_FRAMES = 70
+DISP_SEGMENTS = [   # (first, last, y step per frame, declared speed)
+    (0, 9, 0.0, 0.0), (15, 24, 0.0005, 3.06), (30, 39, 0.002, 12.24),
+    (45, 54, 0.01, 61.2), (60, 69, 0.02, 122.4),
+]
+DISP_DECLARED_NAN = (15, 16)
+
+
+def disp_frame_line(f):
+    player = "0.30000,{:.5f},24.48".format(0.1 + 0.004 * f)
+    ball = "NaN,NaN,NaN"
+    for a, b, step, declared in DISP_SEGMENTS:
+        if a <= f <= b:
+            speed = "NaN" if f in DISP_DECLARED_NAN else "{:.2f}".format(declared)
+            ball = "0.50000,{:.5f},{}".format(0.1 + step * (f - a), speed)
+    return "{}:{}:{}".format(f + 1, player, ball)
+
+
 def main():
     os.makedirs(OUT, exist_ok=True)
     with open(os.path.join(OUT, "fixture_flip_atd.xml"), "w") as handle:
@@ -574,6 +598,9 @@ def main():
     with open(os.path.join(OUT, "fixture_signal_tags.xml"), "w") as handle:
         handle.write(smart_tagging_xml([(c, a / float(FPS), b / float(FPS), t, k)
                                         for c, a, b, t, k in SIG_TAGS]))
+    with open(os.path.join(OUT, "fixture_disp_atd.txt"), "w") as handle:
+        for video_frame in range(DISP_N_FRAMES):
+            handle.write(disp_frame_line(video_frame) + "\n")
     for name in sorted(os.listdir(OUT)):
         print("{:<28} {:>8} bytes".format(name, os.path.getsize(os.path.join(OUT, name))))
 
