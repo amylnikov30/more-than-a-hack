@@ -12,7 +12,7 @@
 Usage
     # competition match: paths from games.asset_paths() (honours MTAH_DATA_DIR), graded frames
     # from games.half_video_blocks("BAR-ATH")
-    PYTHONPATH=/path/to/team-repo python eda/ball_gaps.py OUT_DIR
+    PYTHONPATH=/path/to/team-repo python eda/scripts/ball_gaps.py OUT_DIR
 
     # any other game in the same raw format, e.g. Metrica Sample Game 3 (no Smart Tagging)
     python ball_gaps.py OUT_DIR --raw Sample_Game_3_tracking.txt \\

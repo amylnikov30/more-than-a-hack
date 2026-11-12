@@ -9,7 +9,7 @@ Usage (needs ball_gaps.py next to this file; stdlib + numpy only)
     # competition match: paths from games.asset_paths(), graded frames from
     # games.half_video_blocks(GAME); --exclude defaults to the public GT window and the
     # second-half pre-kickoff frames
-    PYTHONPATH=/path/to/team-repo python eda/sample_long_gaps.py OUT_DIR
+    PYTHONPATH=/path/to/team-repo python eda/scripts/sample_long_gaps.py OUT_DIR
 
     # any other game in the raw ATD format
     python sample_long_gaps.py OUT_DIR --raw RAW.txt --frames 0-69660,69661-143760

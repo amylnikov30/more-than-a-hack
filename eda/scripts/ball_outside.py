@@ -11,14 +11,14 @@ At each margin M (metres beyond the line; `--margin-m` plus `--margins-also`):
 
 Usage
     # competition match: paths from games.asset_paths() (honours MTAH_DATA_DIR)
-    PYTHONPATH=/path/to/team-repo python eda/ball_outside.py OUT_DIR
+    PYTHONPATH=/path/to/team-repo python eda/scripts/ball_outside.py OUT_DIR
 
     # any other game in the raw ATD format (link and crosstab need --tags)
     python ball_outside.py OUT_DIR --raw RAW.txt --frames 0-69660,69661-143760 --pitch 105 68
 
 Writes OUT_DIR/ball_outside_summary.csv (long format: analysis, scope, bin, metric, value,
 unit). scope is "m<margin>:<line>" (line: all, goal_line, touchline). Definitions and fixture
-answers: tests/fixtures/README.md ("ball_outside.py"). Aggregates only.
+answers: eda/tests/fixtures/README.md ("ball_outside.py"). Aggregates only.
 """
 
 import argparse

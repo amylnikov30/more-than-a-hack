@@ -9,14 +9,14 @@ reprojection error), reporting cluster sizes and centres only.
 
 Usage
     # competition match: paths from games.asset_paths() (honours MTAH_DATA_DIR)
-    PYTHONPATH=/path/to/team-repo python eda/gap_stoppage.py OUT_DIR [--clusters 2]
+    PYTHONPATH=/path/to/team-repo python eda/scripts/gap_stoppage.py OUT_DIR [--clusters 2]
 
     # any other game in the raw ATD format
     python gap_stoppage.py OUT_DIR --raw RAW.txt --frames 0-69660,69661-143760 \\
         [--homography H.csv] --pitch 105 68
 
 Writes OUT_DIR/gap_stoppage_summary.csv (long format: analysis, scope, bin, metric, value,
-unit). Definitions and fixture answers: tests/fixtures/README.md ("signal_profiles.py and
+unit). Definitions and fixture answers: eda/tests/fixtures/README.md ("signal_profiles.py and
 gap_stoppage.py"). No per-gap rows anywhere.
 """
 

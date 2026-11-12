@@ -14,14 +14,14 @@ each tag's start (and end), against the same tags shifted circularly within each
 
 Usage
     # competition match: paths from games.asset_paths() (honours MTAH_DATA_DIR)
-    PYTHONPATH=/path/to/team-repo python eda/signal_profiles.py OUT_DIR
+    PYTHONPATH=/path/to/team-repo python eda/scripts/signal_profiles.py OUT_DIR
 
     # any other game in the raw ATD format (profiles need --tags)
     python signal_profiles.py OUT_DIR --raw RAW.txt --frames 0-69660,69661-143760 \\
         [--tags TAGS.xml] [--homography H.csv] --pitch 105 68
 
 Writes OUT_DIR/signal_profiles_summary.csv (long format: analysis, scope, bin, metric, value,
-unit); scope is "<signal>:<group>". Definitions and fixture answers: tests/fixtures/README.md
+unit); scope is "<signal>:<group>". Definitions and fixture answers: eda/tests/fixtures/README.md
 ("signal_profiles.py and gap_stoppage.py"). Aggregates only.
 """
 

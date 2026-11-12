@@ -9,7 +9,7 @@ import pytest
 
 import ball_gaps as bg
 import sample_long_gaps as slg
-from conftest import FIXTURES, EDA
+from conftest import FIXTURES, EDA, SCRIPTS
 
 FLIP_RAW = os.path.join(FIXTURES, "fixture_flip_atd.txt")
 FLIP_META = os.path.join(FIXTURES, "fixture_flip_atd.xml")
@@ -82,3 +82,21 @@ def test_refusal_names_script(capsys):
     with pytest.raises(SystemExit) as err:
         slg.main([os.path.join(EDA, "x_out"), "--raw", RAW, "--frames", "100-1499"])
     assert "~/eda_out/long_gaps" in str(err.value)
+
+
+def test_refusal_from_scripts_folder(tmp_path):
+    # The scripts live in eda/scripts/, two levels below the repo root. repo_root() must still
+    # find the .git root, so a folder elsewhere in the repo (outside eda/) is refused too.
+    import check_channels as cc
+    repo = os.path.dirname(EDA)
+    assert os.path.dirname(os.path.abspath(bg.__file__)) == SCRIPTS
+    assert os.path.realpath(bg.repo_root()) == os.path.realpath(repo)
+    assert os.path.realpath(cc.repo_root()) == os.path.realpath(repo)
+    for inside in (repo, os.path.join(repo, "src", "x_out"), os.path.join(SCRIPTS, "x_out")):
+        with pytest.raises(SystemExit) as err:
+            bg.check_out_dir(inside)
+        assert "refusing" in str(err.value)
+        with pytest.raises(SystemExit):
+            cc.check_out_dir(inside)
+        assert not os.path.exists(os.path.join(repo, "src", "x_out"))
+    bg.check_out_dir(str(tmp_path / "outside"))  # outside the repo: no exit

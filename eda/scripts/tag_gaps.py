@@ -3,7 +3,7 @@
 Code-agnostic first: for every tag code (and every SET PIECES `Type`), how often do gaps overlap
 it, or end (ball reappears) within W seconds of its start, compared with the same tags shifted
 circularly within each half? Definitions and hand-derived fixture answers:
-tests/fixtures/README.md ("tag_gaps.py"); interpretation notes: README.md.
+eda/tests/fixtures/README.md ("tag_gaps.py"); interpretation notes: eda/docs/analyses.md.
 
 Views
     A  profile: P(ball missing) in 1 s bins from -30 s to +30 s around each tag's start (and
@@ -16,7 +16,7 @@ Views
 Usage
     # competition match: paths from games.asset_paths(), graded frames from
     # games.half_video_blocks(GAME)
-    PYTHONPATH=/path/to/team-repo python eda/tag_gaps.py OUT_DIR
+    PYTHONPATH=/path/to/team-repo python eda/scripts/tag_gaps.py OUT_DIR
 
     # any other game in the raw ATD format (views A-C need --tags)
     python tag_gaps.py OUT_DIR --raw RAW.txt --frames 0-69660,69661-143760 [--tags TAGS.xml]

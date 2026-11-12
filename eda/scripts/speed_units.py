@@ -15,13 +15,13 @@ frames of the same half (metres x fps), only where both positions are present. A
 
 Usage
     # competition match: paths from games.asset_paths() (honours MTAH_DATA_DIR)
-    PYTHONPATH=/path/to/team-repo python eda/speed_units.py OUT_DIR
+    PYTHONPATH=/path/to/team-repo python eda/scripts/speed_units.py OUT_DIR
 
     # any other game in the raw ATD format (Sample Game 3 has no speed field: derived only)
     python speed_units.py OUT_DIR --raw RAW.txt --frames 0-69660,69661-143760 --pitch 105 68
 
 Writes OUT_DIR/speed_units_summary.csv (long format: analysis, scope, bin, metric, value, unit).
-Definitions and fixture answers: tests/fixtures/README.md ("speed_units.py"). Aggregates only.
+Definitions and fixture answers: eda/tests/fixtures/README.md ("speed_units.py"). Aggregates only.
 """
 
 import argparse

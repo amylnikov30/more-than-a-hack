@@ -15,7 +15,7 @@ On ball-visible graded frames, a still run is a stretch where the ball's derived
 
 Usage
     # competition match: paths from games.asset_paths() (honours MTAH_DATA_DIR)
-    PYTHONPATH=/path/to/team-repo python eda/ball_stationary.py OUT_DIR
+    PYTHONPATH=/path/to/team-repo python eda/scripts/ball_stationary.py OUT_DIR
 
     # any other game in the raw ATD format
     python ball_stationary.py OUT_DIR --raw RAW.txt --meta META.xml \\
@@ -23,7 +23,7 @@ Usage
 
 Writes OUT_DIR/ball_stationary_summary.csv (long format: analysis, scope, bin, metric, value,
 unit). scope is "s<min still>:<location>". Definitions and fixture answers:
-tests/fixtures/README.md ("ball_stationary.py"). Aggregates only.
+eda/tests/fixtures/README.md ("ball_stationary.py"). Aggregates only.
 """
 
 import argparse
