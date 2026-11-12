@@ -42,21 +42,34 @@ cd ~/more-than-a-hack && git pull
 
 ## Run on the VM (competition match, tactical recording)
 
-`MTAH_DATA_DIR` is already set there. Run from the repository root; outputs go to
-`~/eda_out/`, outside the repository.
+`MTAH_DATA_DIR` is already set there. Every command runs from the team-repo root
+(`~/more-than-a-hack`; change the `cd` if your clone is elsewhere) and writes to `~/eda_out/`,
+outside the repository. These are exactly the runs the notebooks read. Each command writes its own
+folder (the five long-gap strata share `long_gaps`, one CSV each), and no script reads another's
+output, so the order does not matter.
+The commented commands in `eda_ball_missing.ipynb` write `python`; use whichever of `python` and
+`python3` has numpy on the VM.
+
+### Ball-missing EDA (read by `eda_ball_missing.ipynb`)
+
+Channels declared in the ATD metadata, tactical and broadcast:
 
 ```bash
 cd ~/more-than-a-hack && PYTHONPATH="$PWD" python3 eda/check_channels.py "$HOME/eda_out/channels"
 ```
 
 ```bash
-cd ~/more-than-a-hack && PYTHONPATH="$PWD" python3 eda/ball_gaps.py "$HOME/eda_out/ball_gaps"
+cd ~/more-than-a-hack && PYTHONPATH="$PWD" python3 eda/check_channels.py "$HOME/eda_out/channels_broadcast" --source broadcast
 ```
 
-`ball_gaps.py` uses `games.half_video_blocks("BAR-ATH")` for the graded frames and the tactical
-Smart Tagging XML for (b) and (e), and the tactical ATD metadata for the slot teams in (d).
-If the Smart Tagging file is missing, it prints a note and skips (b) and (e).
-Optional sensitivity runs, each to its own folder:
+Ball gaps (`ball_gaps.py`): the main run, then a ±1 s set-piece tolerance and a 5 m cap on the
+flip distance. It uses `games.half_video_blocks("BAR-ATH")` for the graded frames, the tactical
+Smart Tagging XML for (b) and (e) and the tactical ATD metadata for the slot teams in (d); without
+the Smart Tagging file it prints a note and skips (b) and (e).
+
+```bash
+cd ~/more-than-a-hack && PYTHONPATH="$PWD" python3 eda/ball_gaps.py "$HOME/eda_out/ball_gaps"
+```
 
 ```bash
 cd ~/more-than-a-hack && PYTHONPATH="$PWD" python3 eda/ball_gaps.py "$HOME/eda_out/ball_gaps_tol1s" --tag-tolerance 1
@@ -66,25 +79,32 @@ cd ~/more-than-a-hack && PYTHONPATH="$PWD" python3 eda/ball_gaps.py "$HOME/eda_o
 cd ~/more-than-a-hack && PYTHONPATH="$PWD" python3 eda/ball_gaps.py "$HOME/eda_out/ball_gaps_maxdist5" --flip-max-dist 5
 ```
 
-```bash
-cd ~/more-than-a-hack && PYTHONPATH="$PWD" python3 eda/check_channels.py "$HOME/eda_out/channels_broadcast" --source broadcast
-```
-
-Long-gap sample for video review. By default it takes 8 gaps at or above the 90th-percentile
-length and excludes the public GT window and the second-half frames before kickoff
-(`--exclude 11185-18684,110808-113741`):
+Long-gap samples for video review (`sample_long_gaps.py`), one file per length stratum in
+`~/eda_out/long_gaps`. Each excludes the public GT window and the second-half frames before
+kickoff (`--exclude 11185-18684,110808-113741`, the default):
 
 ```bash
-cd ~/more-than-a-hack && PYTHONPATH="$PWD" python3 eda/sample_long_gaps.py "$HOME/eda_out/long_gaps"
+cd ~/more-than-a-hack && PYTHONPATH="$PWD" python3 eda/sample_long_gaps.py "$HOME/eda_out/long_gaps" --min-s 0 --max-s 5 --csv-name gap_00_05_sample.csv
 ```
 
 ```bash
-cd ~/more-than-a-hack && PYTHONPATH="$PWD" python3 eda/sample_long_gaps.py "$HOME/eda_out/long_gaps_2to6" --min-s 2 --max-s 6
+cd ~/more-than-a-hack && PYTHONPATH="$PWD" python3 eda/sample_long_gaps.py "$HOME/eda_out/long_gaps" --min-s 5 --max-s 10 --csv-name gap_05_10_sample.csv
 ```
 
-Gaps vs Smart Tagging codes (`tag_gaps.py`). Without a Smart Tagging
-file it reports only the gap totals and skips views A-C. Sensitivity runs: a tighter restart
-link, and a ±1 s tag tolerance for the overlap view:
+```bash
+cd ~/more-than-a-hack && PYTHONPATH="$PWD" python3 eda/sample_long_gaps.py "$HOME/eda_out/long_gaps" --min-s 10 --max-s 20 --csv-name gap_10_20_sample.csv
+```
+
+```bash
+cd ~/more-than-a-hack && PYTHONPATH="$PWD" python3 eda/sample_long_gaps.py "$HOME/eda_out/long_gaps" --min-s 20 --max-s 35 --csv-name gap_20_35_sample.csv
+```
+
+```bash
+cd ~/more-than-a-hack && PYTHONPATH="$PWD" python3 eda/sample_long_gaps.py "$HOME/eda_out/long_gaps" --min-s 35 --csv-name gap_35plus_sample.csv
+```
+
+Gaps vs Smart Tagging codes (`tag_gaps.py`): the main run, a tighter restart link and a ±1 s tag
+tolerance for the overlap view. Without a Smart Tagging file it reports only the gap totals.
 
 ```bash
 cd ~/more-than-a-hack && PYTHONPATH="$PWD" python3 eda/tag_gaps.py "$HOME/eda_out/tag_gaps"
@@ -98,18 +118,17 @@ cd ~/more-than-a-hack && PYTHONPATH="$PWD" python3 eda/tag_gaps.py "$HOME/eda_ou
 cd ~/more-than-a-hack && PYTHONPATH="$PWD" python3 eda/tag_gaps.py "$HOME/eda_out/tag_gaps_tol1s" --tag-tolerance 1
 ```
 
-Speed units (`speed_units.py`). It streams the whole raw file once (no frame-level output) and
-reads the declared unit from the ATD metadata:
+### Dead-ball EDA (read by the three dead-ball notebooks)
+
+Speed units (`speed_units.py`, read by `eda_extras.ipynb`). It streams the whole raw file once
+and reads the declared unit from the ATD metadata:
 
 ```bash
 cd ~/more-than-a-hack && PYTHONPATH="$PWD" python3 eda/speed_units.py "$HOME/eda_out/speed_units"
 ```
 
-```bash
-cd ~/more-than-a-hack && PYTHONPATH="$PWD" python3 eda/speed_units.py "$HOME/eda_out/speed_units_min2" --min-ms 2
-```
-
-Ball outside the pitch (`ball_outside.py`). Sensitivity: a tighter restart link.
+Ball outside the pitch (`ball_outside.py`, read by `eda_ball_outside_pitch.ipynb`): the main run
+and a tighter restart link.
 
 ```bash
 cd ~/more-than-a-hack && PYTHONPATH="$PWD" python3 eda/ball_outside.py "$HOME/eda_out/ball_outside"
@@ -119,8 +138,8 @@ cd ~/more-than-a-hack && PYTHONPATH="$PWD" python3 eda/ball_outside.py "$HOME/ed
 cd ~/more-than-a-hack && PYTHONPATH="$PWD" python3 eda/ball_outside.py "$HOME/eda_out/ball_outside_link2" --link-window 2
 ```
 
-Ball stationary (`ball_stationary.py`). Sensitivity: a stricter speed threshold and a wider
-mark tolerance:
+Ball stationary (`ball_stationary.py`, read by `eda_ball_stationary.ipynb`): the main run, a
+stricter speed threshold and a wider mark tolerance.
 
 ```bash
 cd ~/more-than-a-hack && PYTHONPATH="$PWD" python3 eda/ball_stationary.py "$HOME/eda_out/ball_stationary"
@@ -135,7 +154,8 @@ cd ~/more-than-a-hack && PYTHONPATH="$PWD" python3 eda/ball_stationary.py "$HOME
 ```
 
 Signals around set-piece starts (`signal_profiles.py`) and gap stoppage signals
-(`gap_stoppage.py`). Both read the homography CSV through `games.asset_paths()`:
+(`gap_stoppage.py`), both read by `eda_extras.ipynb`. Both read the homography CSV through
+`games.asset_paths()`; section 5 of the notebook needs `--clusters 2`.
 
 ```bash
 cd ~/more-than-a-hack && PYTHONPATH="$PWD" python3 eda/signal_profiles.py "$HOME/eda_out/signal_profiles" --ends
@@ -151,9 +171,9 @@ cd ~/more-than-a-hack && PYTHONPATH="$PWD" python3 eda/gap_stoppage.py "$HOME/ed
 
 ### Notebook (`eda_ball_missing.ipynb`)
 
-The notebook lists every run command above as a comment, including the five long-gap strata
-(`gap_00_05_sample.csv` ... `gap_35plus_sample.csv` in `~/eda_out/long_gaps`, made with
-`--min-s/--max-s/--csv-name`). Under each command it reads the outputs from `EDA_OUT`
+The notebook lists the ball-missing run commands above as comments, including the five
+long-gap strata (`gap_00_05_sample.csv` ... `gap_35plus_sample.csv` in `~/eda_out/long_gaps`).
+Under each command it reads the outputs from `EDA_OUT`
 (default `~/eda_out`) and plots them, or shows the sample tables. Section 4 draws the
 `tag_gaps.py` charts: profile small multiples, a lift heatmap and the threshold curves. It finds the public repo through
 `MTAH_PUBLIC_REPO` (default `~/more-than-a-hack-2027`) and the data through `MTAH_DATA_DIR`.
