@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData" autoUpload="Always" serverName="robli-macbook-air-2026@34.148.76.228:22 key (3)" remoteFilesAllowedToDisappearOnAutoupload="false">
+  <component name="PublishConfigData" serverName="robli-macbook-air-2026@34.148.76.228:22 key (3)" remoteFilesAllowedToDisappearOnAutoupload="false">
     <serverData>
       <paths name="robli-macbook-air-2026@34.148.76.228:22 key">
         <serverdata>
@@ -24,6 +24,5 @@
         </serverdata>
       </paths>
     </serverData>
-    <option name="myAutoUpload" value="ALWAYS" />
   </component>
 </project>
