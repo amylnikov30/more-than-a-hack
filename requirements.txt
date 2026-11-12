@@ -1,0 +1,5 @@
+# Runtime dependencies for the EDA scripts and the possession pipeline.
+# Python 3.10 (matches the VM). Pinned for exact reproducibility (RULES.md rule 3).
+numpy==2.2.6
+pandas==2.3.3
+kloppy==3.18.0

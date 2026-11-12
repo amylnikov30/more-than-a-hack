@@ -1,0 +1,8 @@
+# Notebooks, plotting and tests, on top of the runtime dependencies.
+# Rendering to .docx needs Quarto, installed separately (not a pip package here).
+-r requirements.txt
+matplotlib==3.10.9
+jupyterlab==4.6.6
+ipykernel==7.3.0
+nbconvert==7.17.2
+pytest==9.2.0
