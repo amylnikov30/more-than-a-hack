@@ -12,6 +12,14 @@ Files written
     fixture_smart_tagging.xml  SportsCode XML with SET PIECES (mixed case) and one BUILD UP
     fixture_tags.xml           SportsCode XML with several codes and set-piece Types, for
                                tag_gaps.py (whole-frame times)
+    fixture_outside_*          2,000 frames with out-of-bounds ball runs and set-piece tags,
+                               for ball_outside.py
+    fixture_still_*            2,000 frames with still-ball runs at pitch marks and set-piece
+                               tags, for ball_stationary.py
+    fixture_signal_*           400 frames with known player speeds, ball gaps and a homography
+                               CSV, for signal_profiles.py and gap_stoppage.py
+    fixture_speed_atd.*        12 frames, 3 slots + ball, declared speed in km/h, for
+                               speed_units.py
 
 The design (gaps, tags, crowding) is in the constants below; the hand-derived answers it implies
 are in tests/fixtures/README.md and asserted in tests/test_ball_gaps.py.
@@ -332,6 +340,194 @@ def flip_metadata_xml():
 """.format(fps=FPS, n=FLIP_N_FRAMES, players=players, channels=channels, refs=refs)
 
 
+# ---------------------------------------------------------------- speed fixture, speed_units.py
+# 12 frames, 3 slots + ball, motion along y only in steps exact at 5 decimals; declared speed is
+# written in km/h while the metadata says m/s. See fixtures/README.md ("speed_units.py").
+
+SPEED_N_FRAMES = 12
+SPEED_SLOTS = {   # slot: (x, y0, y step per frame, declared, missing frames, extra y from frame)
+    1: (0.30, 0.40, 0.00125, 7.65, (), None),
+    2: (0.50, 0.50, 0.0, 0.00, (), None),
+    3: (0.70, 0.20, 0.0025, 17.00, (3,), (9, 0.1)),
+}
+SPEED_BALL = (0.50, 0.30, 0.005, 30.60, (6, 10))
+
+
+def _speed_group(x, y0, step, declared, missing, extra, f):
+    if f in missing:
+        return "NaN,NaN,NaN"
+    y = y0 + step * f + (extra[1] if extra and f >= extra[0] else 0.0)
+    return "{:.5f},{:.5f},{:.2f}".format(x, y, declared)
+
+
+def speed_frame_line(video_frame):
+    groups = [_speed_group(*SPEED_SLOTS[s], f=video_frame) for s in sorted(SPEED_SLOTS)]
+    ball = _speed_group(*SPEED_BALL, extra=None, f=video_frame)
+    return "{}:{}:{}".format(video_frame + 1, ";".join(groups), ball)
+
+
+def speed_metadata_xml(teams=None, n_frames=None):
+    """Small metadata: one x/y/speed channel set per slot; teams {slot: team id}."""
+    teams = teams or {1: "T1", 2: "T1", 3: "T2"}
+    n_frames = n_frames or SPEED_N_FRAMES
+    players = "\n".join(
+        '      <Player id="P{0}" teamId="{1}"><Name>Track {0}</Name>'
+        '<ShirtNumber>{0}</ShirtNumber></Player>'.format(s, t) for s, t in sorted(teams.items()))
+    channels = "\n".join(
+        '      <PlayerChannel id="player{0}_{1}" playerId="P{0}" channelId="{1}"/>'.format(s, c)
+        for s in sorted(teams) for c in ("x", "y", "speed"))
+    refs = "\n".join(
+        '        <SplitRegister separator=",">' + "".join(
+            '<PlayerChannelRef playerChannelId="player{}_{}"/>'.format(s, c)
+            for c in ("x", "y", "speed")) + "</SplitRegister>" for s in sorted(teams))
+    return """<?xml version="1.0" encoding="utf-8"?>
+<main>
+  <Metadata>
+    <GlobalConfig><FrameRate>{fps}</FrameRate><ProviderName>Synthetic</ProviderName></GlobalConfig>
+    <Teams>
+      <Team id="T1"><Name>Team A</Name></Team>
+      <Team id="T2"><Name>Team B</Name></Team>
+    </Teams>
+    <Players>
+{players}
+    </Players>
+    <Devices><Device id="device1"><Sensors><Sensor id="position"><Channels>
+      <Channel id="x"><Name>position_x</Name><Unit>normalized</Unit></Channel>
+      <Channel id="y"><Name>position_y</Name><Unit>normalized</Unit></Channel>
+      <Channel id="speed"><Name>speed</Name><Unit>meters per second</Unit></Channel>
+    </Channels></Sensor></Sensors></Device></Devices>
+    <PlayerChannels>
+{channels}
+    </PlayerChannels>
+  </Metadata>
+  <DataFormatSpecifications>
+    <DataFormatSpecification endFrame="{n}" separator=":" startFrame="1">
+      <StringRegister name="frameCount"/>
+      <SplitRegister separator=";">
+{refs}
+      </SplitRegister>
+      <SplitRegister separator=","><BallChannelRef channelId="x"/><BallChannelRef channelId="y"/><BallChannelRef channelId="speed"/></SplitRegister>
+    </DataFormatSpecification>
+  </DataFormatSpecifications>
+</main>
+""".format(fps=FPS, n=n_frames, players=players, channels=channels, refs=refs)
+
+
+# ---------------------------------------------------------------- outside fixture, ball_outside.py
+# 2,000 frames, ball at the centre except the out-of-bounds runs R1-R9; see fixtures/README.md.
+
+OUT_N_FRAMES = 2000
+OUT_RUNS = [   # (first, last, x, y): ball position during an out-of-bounds run
+    (100, 124, 1.03, 0.5), (300, 309, 0.5, 1.025), (500, 549, 0.5, -0.01),
+    (700, 702, -0.02, 0.5), (800, 809, 1.03, 0.5), (811, 820, 1.03, 0.5),
+    (1200, 1399, 0.5, 1.05), (1600, 1604, 1.03, 1.05), (1990, 1999, 1.015, 0.5),
+]
+OUT_BALL_NAN = [(125, 199), (550, 599), (810, 810), (1400, 1449)]
+OUT_TAGS = [   # (code, start_frame, end_frame, team, type)
+    ("SET PIECES", 20, 70, "Team A", "Free Kick"),
+    ("SET PIECES", 200, 250, "Team B", "Goal Kick"),
+    ("SET PIECES", 330, 380, "Team A", "Throw-in"),
+    ("SET PIECES", 900, 950, "Team B", "Corner Kick"),
+    ("SET PIECES", 1460, 1510, "Team B", "Throw-in"),
+    ("SET PIECES", 1900, 1950, "Team A", "Free Kick"),
+    ("BUILD UP", 310, 360, "Team A", None),
+]
+
+
+def outside_frame_line(video_frame):
+    players = "0.40000,0.50000,0.00;0.60000,0.50000,0.00"
+    if any(a <= video_frame <= b for a, b in OUT_BALL_NAN):
+        ball = "NaN,NaN,NaN"
+    else:
+        x, y = 0.5, 0.5
+        for a, b, rx, ry in OUT_RUNS:
+            if a <= video_frame <= b:
+                x, y = rx, ry
+        ball = "{:.5f},{:.5f},0.00".format(x, y)
+    return "{}:{}:{}".format(video_frame + 1, players, ball)
+
+
+# ---------------------------------------------------------------- still fixture, ball_stationary.py
+# 2,000 frames, the ball moving except in the still runs S1-S10; see fixtures/README.md.
+
+STILL_N_FRAMES = 2000
+STILL_TEAMS = {1: "T1", 2: "T1", 3: "T2", 4: "T2"}
+STILL_PLAYERS = {1: (0.3, 0.4), 2: (0.4, 0.6), 3: (0.6, 0.4), 4: (0.7, 0.6)}
+STILL_PLAYER_OVERRIDES = {1349: {3: (0.45, 0.4)}}
+STILL_RUNS = [   # (first, last, x, y)
+    (0, 49, 0.5, 0.5), (200, 262, 0.005, 0.01), (400, 436, 0.03, 0.55),
+    (600, 674, 0.89554, 0.5), (800, 830, 0.4, 0.99), (1100, 1119, 0.3, 0.3),
+    (1300, 1349, 0.5, 0.5), (1500, 1549, 0.5, 0.5), (1700, 1729, 0.6, 0.3),
+    (1740, 1769, 0.62, 0.3),
+]
+STILL_BALL_NAN = [1520]
+STILL_BALL_JITTER = {1530: (0.502, 0.5)}
+STILL_TAGS = [   # (code, start_frame, end_frame, team, type)
+    ("SET PIECES", 50, 100, "Team A", "Kick Off"),
+    ("SET PIECES", 270, 320, "Team B", "Corner Kick"),
+    ("SET PIECES", 440, 490, "Team A", "Goal Kick"),
+    ("SET PIECES", 835, 885, "Team B", "Throw-in"),
+    ("SET PIECES", 1125, 1175, "Team A", "Free Kick"),
+    ("SET PIECES", 1350, 1400, "Team B", "Kick Off"),
+    ("SET PIECES", 1555, 1605, "Team A", "Kick Off"),
+]
+
+
+def still_frame_line(video_frame):
+    over = STILL_PLAYER_OVERRIDES.get(video_frame, {})
+    players = ";".join("{:.5f},{:.5f},0.00".format(*over.get(s, STILL_PLAYERS[s]))
+                       for s in sorted(STILL_PLAYERS))
+    if video_frame in STILL_BALL_NAN:
+        ball = "NaN,NaN,NaN"
+    else:
+        x, y = 0.3 + 0.0004 * (video_frame % 1000), 0.7
+        for a, b, rx, ry in STILL_RUNS:
+            if a <= video_frame <= b:
+                x, y = rx, ry
+        x, y = STILL_BALL_JITTER.get(video_frame, (x, y))
+        ball = "{:.5f},{:.5f},0.00".format(x, y)
+    return "{}:{}:{}".format(video_frame + 1, players, ball)
+
+
+# ---------------------------------------------------------------- signal fixture, signal_profiles.py
+# 400 frames, 4 player slots with known one-frame speeds, ball gaps Q1-Q4, a homography CSV;
+# see fixtures/README.md ("signal_profiles.py and gap_stoppage.py").
+
+SIG_N_FRAMES = 400
+SIG_STOPS = [(101, 149), (301, 349)]           # slot 3: steps ending on these frames do not move
+SIG_SLOT4_NAN = (100, 149)
+SIG_BALL_NAN = [(20, 24), (100, 149), (250, 269), (300, 349)]
+SIG_TAGS = [("SET PIECES", 150, 200, "Team A", "Throw-in"),
+            ("SET PIECES", 350, 400, "Team B", "Corner Kick")]
+
+
+def _moving_steps(f):
+    stopped = sum(max(0, min(f, b) - a + 1) for a, b in SIG_STOPS)
+    return f - stopped
+
+
+def signal_frame_line(f):
+    groups = ["0.30000,0.30000,0.00",
+              "0.50000,{:.5f},0.00".format(0.1 + 0.002 * f),
+              "0.60000,{:.5f},0.00".format(0.1 + 0.002 * _moving_steps(f)),
+              "NaN,NaN,NaN" if SIG_SLOT4_NAN[0] <= f <= SIG_SLOT4_NAN[1]
+              else "0.70000,{:.5f},0.00".format(0.05 + 0.002 * f)]
+    if any(a <= f <= b for a, b in SIG_BALL_NAN):
+        ball = "NaN,NaN,NaN"
+    else:
+        ball = "{:.5f},0.50000,0.00".format(0.2 + 0.002 * f)
+    return "{}:{}:{}".format(f + 1, ";".join(groups), ball)
+
+
+def signal_homography_csv():
+    lines = ["frame,h00,h01,h02,h10,h11,h12,h20,h21,h22,reprojection_error,valid"]
+    for f in range(SIG_N_FRAMES):
+        err = 3.0 if 100 <= f <= 149 else 2.0 if 300 <= f <= 349 else 0.5
+        valid = 0 if 300 <= f <= 309 else 1
+        lines.append("{},1,0,0,0,1,0,0,0,1,{:g},{}".format(f, err, valid))
+    return "\n".join(lines) + "\n"
+
+
 def main():
     os.makedirs(OUT, exist_ok=True)
     with open(os.path.join(OUT, "fixture_flip_atd.xml"), "w") as handle:
@@ -351,6 +547,33 @@ def main():
     with open(os.path.join(OUT, "fixture_tags.xml"), "w") as handle:
         handle.write(smart_tagging_xml([(c, a / float(FPS), b / float(FPS), t, k)
                                         for c, a, b, t, k in TAG_FRAMES]))
+    with open(os.path.join(OUT, "fixture_speed_atd.xml"), "w") as handle:
+        handle.write(speed_metadata_xml())
+    with open(os.path.join(OUT, "fixture_speed_atd.txt"), "w") as handle:
+        for video_frame in range(SPEED_N_FRAMES):
+            handle.write(speed_frame_line(video_frame) + "\n")
+    with open(os.path.join(OUT, "fixture_outside_atd.txt"), "w") as handle:
+        for video_frame in range(OUT_N_FRAMES):
+            handle.write(outside_frame_line(video_frame) + "\n")
+    with open(os.path.join(OUT, "fixture_outside_tags.xml"), "w") as handle:
+        handle.write(smart_tagging_xml([(c, a / float(FPS), b / float(FPS), t, k)
+                                        for c, a, b, t, k in OUT_TAGS]))
+    with open(os.path.join(OUT, "fixture_still_atd.xml"), "w") as handle:
+        handle.write(speed_metadata_xml(STILL_TEAMS, STILL_N_FRAMES))
+    with open(os.path.join(OUT, "fixture_still_atd.txt"), "w") as handle:
+        for video_frame in range(STILL_N_FRAMES):
+            handle.write(still_frame_line(video_frame) + "\n")
+    with open(os.path.join(OUT, "fixture_still_tags.xml"), "w") as handle:
+        handle.write(smart_tagging_xml([(c, a / float(FPS), b / float(FPS), t, k)
+                                        for c, a, b, t, k in STILL_TAGS]))
+    with open(os.path.join(OUT, "fixture_signal_atd.txt"), "w") as handle:
+        for video_frame in range(SIG_N_FRAMES):
+            handle.write(signal_frame_line(video_frame) + "\n")
+    with open(os.path.join(OUT, "fixture_signal_homography.csv"), "w") as handle:
+        handle.write(signal_homography_csv())
+    with open(os.path.join(OUT, "fixture_signal_tags.xml"), "w") as handle:
+        handle.write(smart_tagging_xml([(c, a / float(FPS), b / float(FPS), t, k)
+                                        for c, a, b, t, k in SIG_TAGS]))
     for name in sorted(os.listdir(OUT)):
         print("{:<28} {:>8} bytes".format(name, os.path.getsize(os.path.join(OUT, name))))
 

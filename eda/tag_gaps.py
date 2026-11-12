@@ -3,7 +3,7 @@
 Code-agnostic first: for every tag code (and every SET PIECES `Type`), how often do gaps overlap
 it, or end (ball reappears) within W seconds of its start, compared with the same tags shifted
 circularly within each half? Definitions and hand-derived fixture answers:
-tests/fixtures/README.md ("tag_gaps.py"); interpretation notes: EDA_HANDOFF.md.
+tests/fixtures/README.md ("tag_gaps.py"); interpretation notes: README.md.
 
 Views
     A  profile: P(ball missing) in 1 s bins from -30 s to +30 s around each tag's start (and
@@ -221,6 +221,11 @@ def half_arrays(missing, blocks):
 def profile_counts(halves, anchors, window_f, bin_f, offsets=None, chunk=100):
     """Pooled (missing, counted) frames per bin around the anchors.
 
+    halves: {half: (first, L, cs)} from half_arrays, where every frame counts; or
+    {half: (first, L, cs, cs_count)} for any signal (common.signal_halves), where cs sums the
+    signal and cs_count the frames on which it is defined. The first value returned is then the
+    signal sum (float), the second the defined frames.
+
     Bin k covers [t + k*B, t + (k+1)*B) for k = -window/B .. window/B - 1, clipped to the
     anchor's own half. Without offsets: two int arrays (n_bins,). With offsets
     ({half: (K,)}; each half's anchors move together, circularly within the half, while
@@ -231,9 +236,12 @@ def profile_counts(halves, anchors, window_f, bin_f, offsets=None, chunk=100):
     nb = 2 * window_f // bin_f
     ks = (np.arange(nb) - nb // 2) * bin_f
     k_total = 1 if offsets is None else len(next(iter(offsets.values())))
-    miss = np.zeros((k_total, nb), dtype=np.int64)
+    dtype = np.result_type(*[h[2].dtype for h in halves.values()]) if halves else np.int64
+    miss = np.zeros((k_total, nb), dtype=dtype)
     counted = np.zeros((k_total, nb), dtype=np.int64)
-    for half, (first, length, cs) in halves.items():
+    for half, arrays in halves.items():
+        first, length, cs = arrays[:3]
+        cs_count = arrays[3] if len(arrays) > 3 else None
         rel = np.array([a - first for h, a in anchors if h == half], dtype=np.int64)
         if len(rel) == 0:
             continue
@@ -246,7 +254,8 @@ def profile_counts(halves, anchors, window_f, bin_f, offsets=None, chunk=100):
             lo = np.clip(pos[:, :, None] + ks, 0, length)                  # (k, m, nb)
             hi = np.clip(pos[:, :, None] + ks + bin_f, 0, length)
             miss[lo_k:lo_k + chunk] += (cs[hi] - cs[lo]).sum(axis=1)
-            counted[lo_k:lo_k + chunk] += (hi - lo).sum(axis=1)
+            counted[lo_k:lo_k + chunk] += ((hi - lo) if cs_count is None
+                                           else cs_count[hi] - cs_count[lo]).sum(axis=1)
     if offsets is None:
         return miss[0], counted[0]
     return miss, counted

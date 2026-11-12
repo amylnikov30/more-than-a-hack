@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="utf-8"?>
+<file>
+  <ALL_INSTANCES>
+    <instance>
+      <ID>1</ID>
+      <start>2.00</start>
+      <end>4.00</end>
+      <code>SET PIECES</code>
+      <label>
+        <group>Team</group>
+        <text>Team A</text>
+      </label>
+      <label>
+        <group>Half</group>
+        <text>1st Half</text>
+      </label>
+      <label>
+        <group>Type</group>
+        <text>Kick Off</text>
+      </label>
+    </instance>
+    <instance>
+      <ID>2</ID>
+      <start>10.80</start>
+      <end>12.80</end>
+      <code>SET PIECES</code>
+      <label>
+        <group>Team</group>
+        <text>Team B</text>
+      </label>
+      <label>
+        <group>Half</group>
+        <text>1st Half</text>
+      </label>
+      <label>
+        <group>Type</group>
+        <text>Corner Kick</text>
+      </label>
+    </instance>
+    <instance>
+      <ID>3</ID>
+      <start>17.60</start>
+      <end>19.60</end>
+      <code>SET PIECES</code>
+      <label>
+        <group>Team</group>
+        <text>Team A</text>
+      </label>
+      <label>
+        <group>Half</group>
+        <text>1st Half</text>
+      </label>
+      <label>
+        <group>Type</group>
+        <text>Goal Kick</text>
+      </label>
+    </instance>
+    <instance>
+      <ID>4</ID>
+      <start>33.40</start>
+      <end>35.40</end>
+      <code>SET PIECES</code>
+      <label>
+        <group>Team</group>
+        <text>Team B</text>
+      </label>
+      <label>
+        <group>Half</group>
+        <text>1st Half</text>
+      </label>
+      <label>
+        <group>Type</group>
+        <text>Throw-in</text>
+      </label>
+    </instance>
+    <instance>
+      <ID>5</ID>
+      <start>45.00</start>
+      <end>47.00</end>
+      <code>SET PIECES</code>
+      <label>
+        <group>Team</group>
+        <text>Team A</text>
+      </label>
+      <label>
+        <group>Half</group>
+        <text>1st Half</text>
+      </label>
+      <label>
+        <group>Type</group>
+        <text>Free Kick</text>
+      </label>
+    </instance>
+    <instance>
+      <ID>6</ID>
+      <start>54.00</start>
+      <end>56.00</end>
+      <code>SET PIECES</code>
+      <label>
+        <group>Team</group>
+        <text>Team B</text>
+      </label>
+      <label>
+        <group>Half</group>
+        <text>1st Half</text>
+      </label>
+      <label>
+        <group>Type</group>
+        <text>Kick Off</text>
+      </label>
+    </instance>
+    <instance>
+      <ID>7</ID>
+      <start>62.20</start>
+      <end>64.20</end>
+      <code>SET PIECES</code>
+      <label>
+        <group>Team</group>
+        <text>Team A</text>
+      </label>
+      <label>
+        <group>Half</group>
+        <text>2nd Half</text>
+      </label>
+      <label>
+        <group>Type</group>
+        <text>Kick Off</text>
+      </label>
+    </instance>
+  </ALL_INSTANCES>
+</file>

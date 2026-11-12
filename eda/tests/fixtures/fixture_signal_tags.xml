@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<file>
+  <ALL_INSTANCES>
+    <instance>
+      <ID>1</ID>
+      <start>6.00</start>
+      <end>8.00</end>
+      <code>SET PIECES</code>
+      <label>
+        <group>Team</group>
+        <text>Team A</text>
+      </label>
+      <label>
+        <group>Half</group>
+        <text>1st Half</text>
+      </label>
+      <label>
+        <group>Type</group>
+        <text>Throw-in</text>
+      </label>
+    </instance>
+    <instance>
+      <ID>2</ID>
+      <start>14.00</start>
+      <end>16.00</end>
+      <code>SET PIECES</code>
+      <label>
+        <group>Team</group>
+        <text>Team B</text>
+      </label>
+      <label>
+        <group>Half</group>
+        <text>1st Half</text>
+      </label>
+      <label>
+        <group>Type</group>
+        <text>Corner Kick</text>
+      </label>
+    </instance>
+  </ALL_INSTANCES>
+</file>

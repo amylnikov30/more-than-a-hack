@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<main>
+  <Metadata>
+    <GlobalConfig><FrameRate>25</FrameRate><ProviderName>Synthetic</ProviderName></GlobalConfig>
+    <Teams>
+      <Team id="T1"><Name>Team A</Name></Team>
+      <Team id="T2"><Name>Team B</Name></Team>
+    </Teams>
+    <Players>
+      <Player id="P1" teamId="T1"><Name>Track 1</Name><ShirtNumber>1</ShirtNumber></Player>
+      <Player id="P2" teamId="T1"><Name>Track 2</Name><ShirtNumber>2</ShirtNumber></Player>
+      <Player id="P3" teamId="T2"><Name>Track 3</Name><ShirtNumber>3</ShirtNumber></Player>
+    </Players>
+    <Devices><Device id="device1"><Sensors><Sensor id="position"><Channels>
+      <Channel id="x"><Name>position_x</Name><Unit>normalized</Unit></Channel>
+      <Channel id="y"><Name>position_y</Name><Unit>normalized</Unit></Channel>
+      <Channel id="speed"><Name>speed</Name><Unit>meters per second</Unit></Channel>
+    </Channels></Sensor></Sensors></Device></Devices>
+    <PlayerChannels>
+      <PlayerChannel id="player1_x" playerId="P1" channelId="x"/>
+      <PlayerChannel id="player1_y" playerId="P1" channelId="y"/>
+      <PlayerChannel id="player1_speed" playerId="P1" channelId="speed"/>
+      <PlayerChannel id="player2_x" playerId="P2" channelId="x"/>
+      <PlayerChannel id="player2_y" playerId="P2" channelId="y"/>
+      <PlayerChannel id="player2_speed" playerId="P2" channelId="speed"/>
+      <PlayerChannel id="player3_x" playerId="P3" channelId="x"/>
+      <PlayerChannel id="player3_y" playerId="P3" channelId="y"/>
+      <PlayerChannel id="player3_speed" playerId="P3" channelId="speed"/>
+    </PlayerChannels>
+  </Metadata>
+  <DataFormatSpecifications>
+    <DataFormatSpecification endFrame="12" separator=":" startFrame="1">
+      <StringRegister name="frameCount"/>
+      <SplitRegister separator=";">
+        <SplitRegister separator=","><PlayerChannelRef playerChannelId="player1_x"/><PlayerChannelRef playerChannelId="player1_y"/><PlayerChannelRef playerChannelId="player1_speed"/></SplitRegister>
+        <SplitRegister separator=","><PlayerChannelRef playerChannelId="player2_x"/><PlayerChannelRef playerChannelId="player2_y"/><PlayerChannelRef playerChannelId="player2_speed"/></SplitRegister>
+        <SplitRegister separator=","><PlayerChannelRef playerChannelId="player3_x"/><PlayerChannelRef playerChannelId="player3_y"/><PlayerChannelRef playerChannelId="player3_speed"/></SplitRegister>
+      </SplitRegister>
+      <SplitRegister separator=","><BallChannelRef channelId="x"/><BallChannelRef channelId="y"/><BallChannelRef channelId="speed"/></SplitRegister>
+    </DataFormatSpecification>
+  </DataFormatSpecifications>
+</main>

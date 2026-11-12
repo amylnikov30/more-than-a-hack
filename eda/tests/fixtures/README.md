@@ -318,3 +318,307 @@ Throw-in at L = 5 s: 1/2 = 0.5, recall 1/2 = 0.5.
 equals the observed profile and observed shares. The vectorised profile null equals a slow
 per-shift loop. The same seed gives identical null statistics. Like (e), the fixture needs
 `--null-min-shift 5`.
+
+# `speed_units.py`: declared vs derived speed
+
+`fixture_speed_atd.xml` + `fixture_speed_atd.txt` (plain text, 12 lines). Video frames 0..11
+(frame_id 1..12), graded `--frames 0-5,6-11`, pitch 105.3 x 68.0 m, 25 fps. Three player slots
+and the ball, each group `x,y,speed`. Every movement is along y, in steps that are exact at 5
+decimals, so derived speeds are whole multiples of 68 x 25 = 1,700 m/s per normalised unit.
+The metadata declares the speed channel as `meters per second`, while the data are written in
+km/h: the script must report the declared unit and the verdict side by side.
+
+| object | x | y on video frame f | missing | declared speed | derived per step |
+|---|---|---|---|---|---|
+| slot 1 | 0.30 | 0.40000 + 0.00125 f | never | 7.65 | 0.085 m -> 2.125 m/s (ratio 3.6) |
+| slot 2 | 0.50 | 0.50000 | never | 0.00 | 0 m/s (below the 1 m/s floor: no ratio) |
+| slot 3 | 0.70 | 0.20000 + 0.0025 f, plus 0.1 from f = 9 on | f = 3 | 17.00 | 0.17 m -> 4.25 m/s (ratio 4.0); step 8->9 is a slot swap: 0.1025 x 1,700 = 174.25 m/s |
+| ball | 0.50 | 0.30000 + 0.005 f | f = 6, 10 | 30.60 | 0.34 m -> 8.5 m/s (ratio 3.6) |
+
+## Rules (decided before coding)
+
+- A **pair** is (f - 1, f) with both video frames graded **in the same half**, both records in
+  the file, and the object's x and y finite on both. Derived speed = Euclidean displacement in
+  metres x fps. Declared speed is the third field on frame f (the later frame).
+- **Ratio** = declared / derived, only on pairs with derived speed in `[--min-ms, cap]` and a
+  finite declared speed. Defaults: `--min-ms 1` (below it frame noise dominates), cap
+  `--cap-player 12` m/s (about the fastest sprint) and `--cap-ball 40` m/s (a very hard shot).
+  Above the cap the pair is counted as `n_over_cap` (slot swaps, ball jumps).
+- Player pairs only use slots that sit at the same position in both lines; if the two lines
+  have different slot counts, the player pairs of that step are skipped (a spec boundary).
+- **Percentiles** (numpy, linear): derived over all pairs, no cap (so swaps show in the tail);
+  declared over every graded frame with a finite declared speed for a present object.
+- **Verdict**, per object class with at least one ratio: `m/s` if the median ratio is within
+  +-10% of 1, `km/h` if within +-10% of 3.6, else `unclear`. Overall: the shared answer if
+  players and ball agree (or only one has ratios), `conflict` if they differ, `no declared
+  speed` if neither has any ratio.
+
+## Expected
+
+Pairs: f in 1..5 and 7..11 (step 5->6 crosses halves).
+
+- slot 1: 10 pairs at 2.125 m/s, ratio 3.6 each.
+- slot 2: 10 pairs at 0 m/s, no ratio.
+- slot 3: frame 3 is missing, so steps 2->3 and 3->4 drop: 8 pairs (f = 1, 2, 5, 7, 8, 9, 10,
+  11). Seven at 4.25 m/s (ratio 4.0), one (8->9) at 174.25 m/s: over the cap.
+- ball: frames 6 and 10 missing; pairs f = 1..5, 8, 9 = 7, all 8.5 m/s, ratio 3.6.
+
+**Players.** 28 pairs, 1 over the cap, 17 ratios (ten 3.6, seven 4.0). Sorted ratio positions
+0..16: median = position 8 = 3.6; p25 = position 4 = 3.6; p75 = position 12 = 4.0. Verdict
+`km/h`.
+Derived percentiles over 28 values (ten 0, ten 2.125, seven 4.25, one 174.25; position p x 27):
+p50 = position 13.5 = 2.125; p99 = position 26.73 = 4.25 + 0.73 x 170 = 128.35;
+p99.9 = position 26.973 = 4.25 + 0.973 x 170 = 169.66.
+Declared over 35 present slot-frames (twelve 0.00, twelve 7.65, eleven 17.00; position p x 34):
+p50 = position 17 = 7.65; p99 = position 33.66 = 17.0; p99.9 = 17.0.
+
+**Ball.** 7 pairs, 0 over the cap, 7 ratios of 3.6: median 3.6, p25 3.6, p75 3.6. Verdict
+`km/h`. Derived p50 = p99 = p99.9 = 8.5. Declared over 10 present frames: all 30.6.
+
+**Overall verdict** `km/h`; declared unit from the metadata: `meters per second`.
+
+**Other checks.** With `--frames 0-11` (one block) step 5->6 counts: slot 1 gains a pair
+(11 ratios of 3.6), slot 2 gains one, slot 3 gains one ratio of 4.0 (5->6), and the ball does
+not (frame 6 is missing). If the speed field is absent (`x,y` groups only, as in Metrica Sample
+Game 3) there are no ratios and the verdict is `no declared speed`; the derived percentiles are
+still reported. A missing line (frame_id 4 removed) breaks the steps 2->3 and 3->4 exactly
+like a NaN.
+
+# `ball_outside.py`: ball outside the pitch (clause a)
+
+`fixture_outside_atd.txt` (plain text, 2,000 lines, 2 static player slots) and
+`fixture_outside_tags.xml`. Video frames 0..1999 (frame_id 1..2000), graded
+`--frames 0-999,1000-1999`, pitch 105.3 x 68.0 m. The ball sits at (0.5, 0.5) except:
+
+| run | frames | ball (normalised) | beyond the line by | line | next frame |
+|---|---|---|---|---|---|
+| R1 | 100-124 (25) | x 1.03 | 3.159 m | goal line | 125: missing (125-199 NaN) |
+| R2 | 300-309 (10) | y 1.025 | 1.7 m | touchline | 310: inside |
+| R3 | 500-549 (50) | y -0.01 | 0.68 m | touchline | 550: missing (550-599 NaN) |
+| R4 | 700-702 (3) | x -0.02 | 2.106 m | goal line | 703: inside |
+| R8 | 800-809 (10) | x 1.03 | 3.159 m | goal line | 810: missing (810 NaN) |
+| R9 | 811-820 (10) | x 1.03 | 3.159 m | goal line | 821: inside |
+| R5 | 1200-1399 (200) | y 1.05 | 3.4 m | touchline | 1400: missing (1400-1449 NaN) |
+| R7 | 1600-1604 (5) | x 1.03, y 1.05 | 3.159 m / 3.4 m | touchline (larger excess) | 1605: inside |
+| R6 | 1990-1999 (10) | x 1.015 | 1.5795 m | goal line | none: half end |
+
+Ball missing on 125-199, 550-599, 810, 1400-1449 = 176 frames, so 1,824 visible graded frames.
+
+Tags (all `SET PIECES` unless noted, each 50 frames long, times written as frame / 25 s):
+T1 Free Kick 20, T2 Goal Kick 200, T3 Throw-in 330, T4 Corner Kick 900, T5 Throw-in 1460,
+T6 Free Kick 1900, T7 `BUILD UP` 310 (not a set piece: must be ignored).
+
+## Rules (decided before coding)
+
+- Excess beyond the goal lines `ex = max(-x, x - 1) x 105.3` m, beyond the touchlines
+  `ey = max(-y, y - 1) x 68.0` m. A ball-visible graded frame is **out** at margin M if
+  `max(ex, ey) > M` (strict). Its **line** is the goal line if `ex >= ey`, else the touchline.
+- A **run** is a maximal stretch of out frames inside one graded half; a missing ball or a
+  missing record ends it. A run's line is the line of its first frame. Lengths go in the
+  `ball_gaps` bins `[0,0.5) [0.5,2) [2,5) [5,inf)` s.
+- **What follows** a run ending at e: `half_end` if e is the last frame of its half, else
+  `missing` if the ball is missing (or the record is absent) on e + 1, else `inside` (visible
+  and not out at this margin).
+- **Restart link**: a run links to a group (SET PIECES, or one `Type`) if a start a of that
+  group in the same half has `|e - a| <= W` (`--link-window`, default 5 s = 125 fr). The
+  **cross-tab Type** is the Type of the SET PIECES start nearest to e within W (ties go to the
+  earlier start; no Type -> `(no Type)`; nothing within W -> `none`).
+- **Null**: the `tag_gaps` link null (anchors shifted circularly within each half); a run is a
+  point at e. Offset 0 reproduces the observed counts.
+- All of it is computed for every margin in `--margin-m` (main, default 1) and
+  `--margins-also` (default `0,2`).
+
+## Expected
+
+**Out frames and runs**
+
+| margin | runs | out frames (goal / touch) | share of 1,824 visible | follows: missing / inside / half_end | SET PIECES link |
+|---|---|---|---|---|---|
+| 0 m | 9 (R1-R9) | 323 (58 / 265) | 0.177083 | 4 / 4 / 1 | 6 / 9 |
+| 1 m | 8 (all but R3) | 273 (58 / 215) | 0.149671 | 3 / 4 / 1 | 6 / 8 |
+| 2 m | 6 (R1 R4 R8 R9 R5 R7) | 253 (48 / 205) | 0.138706 | 3 / 3 / 0 | 4 / 6 |
+
+Run lengths at 1 m: `<0.5s` 6 runs / 48 frames (R2 R4 R8 R9 R7 R6), `0.5-2s` 1 / 25 (R1),
+`2-5s` 0 / 0, `>=5s` 1 / 200 (R5). By line at 1 m: goal line 5 runs (R1 R4 R8 R9 R6), touchline
+3 (R2 R5 R7).
+
+**Links at 1 m** (run end e -> starts within 125 fr):
+R1 124 -> T1 (104), T2 (76): nearest Goal Kick. R2 309 -> T2 (109), T3 (21): Throw-in.
+R4 702 -> none (T4 is 198 away). R8 809 -> T4 (91): Corner Kick. R9 820 -> T4 (80): Corner Kick.
+R5 1399 -> T5 (61): Throw-in. R7 1604 -> none. R6 1999 -> T6 (99): Free Kick.
+
+| group | links at 1 m | goal line | touchline |
+|---|---|---|---|
+| `code:SET PIECES` | 6 / 8 | 4 / 5 | 2 / 3 |
+| `type:Corner Kick` | 2 (R8 R9) | 2 | 0 |
+| `type:Free Kick` | 2 (R1 R6) | 2 | 0 |
+| `type:Goal Kick` | 2 (R1 R2) | 1 | 1 |
+| `type:Throw-in` | 2 (R2 R5) | 0 | 2 |
+
+Cross-tab at 1 m (nearest Type): goal line Goal Kick 1, Corner Kick 2, Free Kick 1, none 1;
+touchline Throw-in 2, none 1.
+
+**Other checks.** `common.find_runs` on the main fixture's missing-ball mask returns the same
+(half, start, end) as `ball_gaps.find_gaps`. Without a tags file the link and cross-tab parts
+are skipped and the rest is unchanged.
+
+# `ball_stationary.py`: ball stationary at a restart location (clause c)
+
+`fixture_still_atd.xml` + `fixture_still_atd.txt` (2,000 lines; 4 player slots: 1-2 home `T1`,
+3-4 away `T2`) and `fixture_still_tags.xml`. Graded `--frames 0-999,1000-1999`, pitch
+105.3 x 68.0 m. Outside the still runs the ball moves along y = 0.7,
+x = 0.3 + 0.0004 x (f mod 1000), i.e. 1.053 m/s, never near a mark. Players stand at x 0.3, 0.4
+(home) and 0.6, 0.7 (away), except slot 3 at x 0.45 on frame 1349.
+
+| run | frames | len (s) | ball | location | notes |
+|---|---|---|---|---|---|
+| S1 | 0-49 | 50 (2.0) | (0.5, 0.5) | centre spot | kick-off, both teams in own half |
+| S2 | 200-262 | 63 (2.52) | (0.005, 0.01) | corner arc | 0.86 m from the corner; also in the touchline band |
+| S3 | 400-436 | 37 (1.48) | (0.03, 0.55) | goal area | 3.159 m from the goal line, 3.4 m off centre |
+| S4 | 600-674 | 75 (3.0) | (0.89554, 0.5) | penalty spot | right-hand end: 10.9996 m from the goal line |
+| S5 | 800-830 | 31 (1.24) | (0.4, 0.99) | touchline band | 0.68 m inside the touchline |
+| S6 | 1100-1119 | 20 (0.8) | (0.3, 0.3) | elsewhere | below 1 s |
+| S7 | 1300-1349 | 50 (2.0) | (0.5, 0.5) | centre spot | away slot 3 at x 0.45 (5.3 m in the home half) on 1349: not a kick-off |
+| S8 | 1500-1549 | 50 (2.0) | (0.5, 0.5) | centre spot | ball missing on 1520, jitter to x 0.502 on 1530: still one run; kick-off |
+| S9 | 1700-1729 | 30 (1.2) | (0.6, 0.3) | elsewhere | |
+| S10 | 1740-1769 | 30 (1.2) | (0.62, 0.3) | elsewhere | 10 moving frames after S9: a separate run |
+
+Tags (`SET PIECES`, 50 frames each): T1 Kick Off 50, T2 Corner Kick 270, T3 Goal Kick 440,
+T4 Throw-in 835, T5 Free Kick 1125, T6 Kick Off 1350, T7 Kick Off 1555.
+
+## Rules (decided before coding)
+
+- **Speed** on frame f = displacement between f - lag and f, in metres, x fps / lag
+  (`--lag`, default 5 frames = 0.2 s, so a few centimetres of jitter per frame do not read as
+  motion). Defined only if the ball is visible on both and both frames are graded in the same
+  half.
+- A window [f - lag, f] with speed < `--still-ms` (default 0.5) marks all its frames; a frame is
+  **still** if it is marked and the ball is visible on it. A one-frame jump only breaks the
+  windows that end or start on it, so the jump frame itself stays still.
+- **Runs**: maximal still stretches in a half (`common.find_runs`), then merged when at most
+  `--still-gap` frames (default 3) separate them in the same half. A run's length counts the
+  bridged frames. Kept if length >= ceil(`--min-still-s` x fps) frames (main 1 s; also 0.5 and
+  2 s via `--min-still-also`).
+- **Location** of a run: the median x and y over its visible frames, in metres, folded so the
+  geometry is symmetric (distance to the nearer goal line `dx`, nearer touchline `dy`; signed,
+  negative outside). First match wins:
+  1. centre spot: within `--spot-tol-m` (default 1) of (L/2, W/2);
+  2. penalty spot: within the tolerance of (11, W/2) from either goal line;
+  3. corner arc: within 1 m + tolerance of a corner;
+  4. goal area: `dx <= 5.5 + tol` and `|y - W/2| <= 9.16 + tol`;
+  5. touchline band: `|dy| <= --band-m` (default 2);
+  6. elsewhere.
+  IFAB marks are absolute metres (11 m, 5.5 m, 9.16 m = 3.66 + 5.5, 1 m arc); only the halfway
+  line and the centre scale with `--pitch`.
+- **Frame share** = run frames / graded frames (2,000 here). Length bins (s, half-open):
+  `[0,1) [1,2) [2,5) [5,10) [10,inf)`.
+- **Link / cross-tab / null**: as in `ball_outside.py`, with the run's last frame as the point.
+- **Kick-off check** (needs `--meta`): a centre-spot run whose last frame has at least one
+  player of each team and, with t = tol / L in normalised units, every home player at
+  x <= 0.5 + t and every away player at x >= 0.5 - t, or the mirror. Counted per half.
+
+## Expected
+
+Window check for S8: valid still windows end at g in 1505..1549 except 1520 and 1525 (missing
+ball) and 1530 and 1535 (jitter). Their union covers 1500..1549; dropping the missing 1520
+leaves 1500-1519 and 1521-1549, 1 frame apart, so they merge into one run of 50 frames.
+
+| min still | runs | centre / corner / goal area / penalty / touchline / elsewhere (runs, frames) | frames | SET PIECES link |
+|---|---|---|---|---|
+| 1 s (25 fr) | 9 (all but S6) | 3/150, 1/63, 1/37, 1/75, 1/31, 2/60 | 416 (0.208) | 6 / 9 |
+| 0.5 s (13 fr) | 10 | as above, elsewhere 3/80 | 436 (0.218) | 7 / 10 |
+| 2 s (50 fr) | 5 (S1 S2 S4 S7 S8) | 3/150, 1/63, 0/0, 1/75, 0/0, 0/0 | 288 (0.144) | 4 / 5 |
+
+Lengths at 1 s: `1-2s` 4 (S3 S5 S9 S10), `2-5s` 5, the rest 0.
+
+Links at 1 s (each run's end is within 125 frames of its own tag only): S1 49 -> T1 (1),
+S2 262 -> T2 (8), S3 436 -> T3 (4), S5 830 -> T4 (5), S7 1349 -> T6 (1), S8 1549 -> T7 (6);
+S4, S9, S10 none. SET PIECES by location: centre 3/3, corner 1/1, goal area 1/1, penalty 0/1,
+touchline 1/1, elsewhere 0/2. By Type: Kick Off 3, Corner Kick 1, Goal Kick 1, Throw-in 1,
+Free Kick 0 (S6 links Free Kick only at 0.5 s).
+
+Cross-tab at 1 s: centre spot Kick Off 3; corner arc Corner Kick 1; goal area Goal Kick 1;
+penalty spot none 1; touchline band Throw-in 1; elsewhere none 2.
+
+Kick-off check at 1 s: half 1 1 of 1 centre-spot runs (S1); half 2 1 of 2 (S8 yes, S7 no).
+Without `--meta` it is skipped.
+
+# `signal_profiles.py` and `gap_stoppage.py`: per-frame signals (clause d)
+
+`fixture_signal_atd.txt` (400 lines, 4 player slots), `fixture_signal_homography.csv` and
+`fixture_signal_tags.xml`. Graded `--frames 0-199,200-399`, pitch 105.3 x 68.0 m. The tests
+use `--lag 1` so that each player's speed is one frame step (the default lag is 5).
+
+| slot | position on video frame f | speed |
+|---|---|---|
+| 1 | fixed (0.3, 0.3) | 0 |
+| 2 | x 0.5, y 0.1 + 0.002 f | 0.002 x 68 x 25 = 3.4 m/s |
+| 3 | x 0.6, y 0.1 + 0.002 m(f), m(f) = moving steps up to f; the steps ending on 101-149 and 301-349 do not move | 3.4 m/s, 0 on 101-149 and 301-349 |
+| 4 | x 0.7, y 0.05 + 0.002 f; NaN on 100-149 | 3.4 m/s |
+
+Ball: x 0.2 + 0.002 f, y 0.5 (5.265 m/s, always inside), NaN on the gaps Q3 20-24 (5 fr,
+0.2 s), Q1 100-149 (50 fr, 2.0 s), Q4 250-269 (20 fr, 0.8 s), Q2 300-349 (50 fr, 2.0 s).
+Homography: `reprojection_error` 0.5 and `valid` 1, except 3.0 on 100-149 and 2.0 on 300-349,
+with `valid` 0 on 300-309. Tags: `SET PIECES` Throw-in [150, 200), Corner Kick [350, 400).
+
+## Rules (decided before coding)
+
+- **Signals**, one value per graded frame (NaN = undefined, not counted):
+  - `ball_missing`: 1 if the ball is missing or the record is absent, else 0 (as in
+    `tag_gaps` view A: frames beyond the file count as missing);
+  - `ball_outside`: 1 if the ball is visible and out at `--margin-m` (default 1), else 0
+    (NaN when the ball is missing);
+  - `ball_still`: 1 if the frame lies in a `ball_stationary.py` still run of at least
+    `--min-still-s` (default 1), else 0 (NaN when the ball is missing);
+  - `slow_players`: among slots present on f and on f - lag (same half, same slot count), the
+    share whose speed is below `--walk-ms` (default 2.0); NaN if there is none;
+  - `reproj_error`: homography `reprojection_error` where `valid` is 1, else NaN;
+  - `n_tracked`: number of player slots with finite x and y (referees included: slots are
+    anonymous); NaN without a record.
+- **Profile**: as `tag_gaps` view A, but the value per bin is the pooled mean of the signal:
+  sum over defined frames / number of defined frames, over all instances. The null and the
+  window clipping are the same. For `ball_missing` this is exactly view A.
+- **Gap summary** (`gap_stoppage.py`): per gap from `ball_gaps.find_gaps`, the mean of
+  `slow_players`, `reproj_error` and `n_tracked` over the gap's frames where defined (NaN if
+  none). Per length bin `[0,2) [2,5) [5,10) [10,20) [20,35) [35,60) [60,inf)` s: n (gaps with a
+  defined mean), median, p25, p75 (numpy, linear). `--clusters k`: k-means on standardised
+  (ln length in s, slow share, reprojection error) over gaps with all three defined; best of 10
+  seeded starts by inertia; clusters sorted by centre length; centres reported in original units
+  (length as exp of the mean ln length).
+
+## Expected (`--lag 1`)
+
+Per-frame `slow_players`: 0.25 on most frames (slot 1 slow, 2-4 fast); 1/3 on 100 (slot 4
+missing, slot 3's step moves) and 150 (slot 4 missing on 149); 2/3 on 101-149 (slots 1 and 3
+slow, slot 4 missing); 0.5 on 301-349; NaN on 0 and 200 (no earlier frame in the half). Slot 3
+moves on step 300 and 350, so 300 and 350 are 0.25.
+`n_tracked`: 3 on 100-149, 4 elsewhere.
+
+**Profiles, `--window 2 --bin 1`.** Throw-in at 150: bins [100,125) [125,150) [150,175)
+[175,200). Corner Kick at 350: [300,325) ... [375,400).
+
+| signal | group | -2 s | -1 s | 0 s | 1 s |
+|---|---|---|---|---|---|
+| slow_players | Throw-in | (1/3 + 24 x 2/3) / 25 = 0.653333 | 0.666667 | (1/3 + 24 x 0.25) / 25 = 0.253333 | 0.25 |
+| slow_players | Corner Kick | (0.25 + 24 x 0.5) / 25 = 0.49 | 0.5 | 0.25 | 0.25 |
+| slow_players | SET PIECES | 28.583333 / 50 = 0.571667 | 29.166667 / 50 = 0.583333 | 12.583333 / 50 = 0.251667 | 0.25 |
+| n_tracked | Throw-in | 3 | 3 | 4 | 4 |
+| reproj_error | Corner Kick | 2.0 (15 counted: 310-324) | 2.0 (25) | 0.5 | 0.5 |
+| ball_missing | Throw-in | 1.0 | 1.0 | 0.0 | 0.0 |
+| ball_outside, ball_still | SET PIECES | NaN (0 counted: inside Q1 and Q2) | NaN | 0 | 0 |
+
+**Gap summary.** Q1: slow (1/3 + 49 x 2/3) / 50 = 0.66, reproj 3.0, tracked 3. Q2: slow
+(0.25 + 49 x 0.5) / 50 = 0.495, reproj 2.0 (310-349 only), tracked 4. Q3 and Q4: 0.25, 0.5, 4.
+
+| bin | n | slow median / p25 / p75 | reproj median / p25 / p75 | tracked median / p25 / p75 |
+|---|---|---|---|---|
+| 0-2s | 2 (Q3 Q4) | 0.25 / 0.25 / 0.25 | 0.5 / 0.5 / 0.5 | 4 / 4 / 4 |
+| 2-5s | 2 (Q1 Q2) | 0.5775 / 0.53625 / 0.61875 | 2.5 / 2.25 / 2.75 | 3.5 / 3.25 / 3.75 |
+| the rest | 0 | NaN | NaN | NaN |
+
+`--clusters 2`: sizes 2 and 2. Short cluster: length exp(mean(ln 0.2, ln 0.8)) = 0.4 s, slow
+0.25, reproj 0.5. Long cluster: 2.0 s, slow 0.5775, reproj 2.5.
+
+**Reproduction.** On the main fixture with `fixture_tags.xml`, `signal_profiles` for
+`ball_missing` equals `tag_gaps.view_a` (observed, and null with the same offsets) for every
+SET PIECES group, starts and ends.
