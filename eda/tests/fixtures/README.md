@@ -1153,3 +1153,24 @@ Accuracy with events: geometric 3 / 3, last_opposite 1 / 1, label_opposite 1 / 1
 (1.0); geometric-last_opposite 1 restart, geometric-tag_team 2, geometric-label_after 3,
 last_opposite-tag_team 0 (NaN). With tags: accuracy NaN (no truth); geometric-label_after 2
 restarts, agreement 1.0.
+
+## Expected: `poss_durations.py`
+
+**Rules (decided before coding).** Reference game only (`--events`; the script refuses to run
+without it). Possessions are maximal runs of one true label inside a live run. A possession ends
+in a `turnover` (the next frame is live with the other label), a `dead` ball (the next frame is
+dead) or at the `half_end` (censored: its true length is unknown). Length in s = frames / fps.
+Rows: count, p10 / p25 / p50 / p75 / p90 and mean, counts per bin `[0,2) [2,5) [5,10) [10,20)
+[20,40) [40,inf)` s, all and per team; per end type count, share of possessions and median
+length; the turnover share among possessions that ended (turnover or dead); the mean and sample
+standard deviation (ddof 1) of ln(length in s), for a log-normal prior; and a discrete hazard per
+bin: possessions still running at the bin's start (`at_risk`), those ending in it by turnover or
+dead ball (`ends`; half-end ones are censored, never counted as ends), `hazard` = ends / at_risk.
+
+**By hand.** Possessions: home 50-299 (10 s, turnover), away 300-499 (8 s, dead), home 550-999
+(18 s, half end), away 1050-1399 (14 s, turnover), home 1400-1999 (24 s, half end). Lengths 8,
+10, 14, 18, 24 s: p10 8.8, p25 10, p50 14, p75 18, p90 21.6, mean 14.8; bins `5-10s` 1,
+`10-20s` 3, `20-40s` 1, others 0. Home: 3 (median 18 s); away: 2 (median 11 s). Ends: turnover
+2 (0.4, median 12 s), dead 1 (0.2, 8 s), half end 2 (0.4, 21 s); turnover share of ended 2 / 3.
+ln-length mean 2.618, sd 0.441. Hazard: `0-2s` 0 / 5, `2-5s` 0 / 5, `5-10s` 1 / 5 = 0.2,
+`10-20s` 2 / 4 = 0.5, `20-40s` 0 / 1, `>=40s` NaN (none at risk).

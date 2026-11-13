@@ -902,3 +902,53 @@ touch is often not the last real one.
   would question the pseudo-labels near restarts rather than the rule.
 - How many restarts have no `tag_team` (all throw-ins are `N/A`)? That share needs the
   geometric rule (a player beyond the touchline).
+
+### Possession durations (`poss_durations.py`, reference game only)
+
+**Question.** How long do live possessions last, and how do they end? This is the duration
+prior for a hidden semi-Markov model, and the reference for how many possessions a submission
+should produce per minute.
+
+**Definitions.** Possessions from the true labels (`poss_reference.py`): maximal runs of one
+team inside a live run. End: `turnover` (the next frame is live, other team), `dead` (the next
+frame is dead) or `half_end` (censored). Length quantiles, mean and bins `[0,2) [2,5) [5,10)
+[10,20) [20,40) [40,inf)` s, all and per team; per end type count, share and median length; the
+turnover share of possessions that ended; mean and sd (ddof 1) of ln(length in s); a discrete
+hazard per bin (possessions still running at the bin start, those ending in it by turnover or
+dead ball, the ratio; half-end ones are censored). The script refuses to run without `--events`.
+
+**CSV schema** (`poss_durations_summary.csv`), after the shared rows:
+
+| analysis | scope | bin | metric | unit |
+|---|---|---|---|---|
+| possessions | all / H / A | `` / p10 ... p90 / mean | n, length | count, s |
+| bins | all / H / A | `0-2s` ... `>=40s` | n | count |
+| ends | turnover / dead / half_end / ended | `` / p50 | n, share, length, turnover_share | count, share, s |
+| fit | lognormal | | log_mean, log_sd | ln s |
+| hazard | all | bin | at_risk, ends, hazard | possessions, share of at_risk |
+
+**Tests.** `tests/test_poss_durations.py`: the five fixture possessions, quantiles, bins, end
+types (two censored at half end), the log-normal fit, the hazard per bin, and the refusal
+without `--events`.
+
+**Results on Sample Game 3** (`--degrade` changes nothing here: labels come from the events).
+382 possessions in 63.7 live minutes (6.0 per minute); length p10 0.6, p25 1.9, p50 5.1, p75
+14.0, p90 27.9 s, mean 10.0 s; home median 6.0 s, away 4.2 s. Bins: `0-2s` 99, `2-5s` 91,
+`5-10s` 65, `10-20s` 63, `20-40s` 53, `>=40s` 11. Ends: turnover 280 (73%, median 5.5 s), dead
+ball 102 (27%, median 3.2 s); none at a half end (every half ends with an `END HALF` stoppage).
+Log-normal: mean ln(s) 1.37 (4.0 s), sd 1.77. Hazard per bin: 0.26, 0.32, 0.34, 0.50, 0.83,
+1.0: the longer a possession has lasted, the likelier it is to end in the next bin, so a
+constant-hazard (geometric) duration, as in a plain HMM, is a poor fit.
+
+**Caveat.** A quarter of these possessions last under 2 s. The event-derived labels count every
+`RECOVERY` as a change, including loose balls the ground truth may not call controlled; the
+public window's 17 possessions average 14.2 s against 10.0 s here. Treat the short end of this
+distribution as an upper bound on how many brief possessions to expect, and compare a model's
+possession count per live minute with both (6.0 here; 4.2 in the public window, 17
+possessions in 6,031 live frames, DATA.md).
+
+**Questions for interpretation.**
+- Does a log-normal with these parameters describe the bins well? If not, the semi-Markov
+  model should use the empirical bins or the hazard directly.
+- How many possessions per live minute does a candidate model produce on the match? Far above
+  6 means it over-splits (the baseline's failure); far below 4 means it misses turnovers.
