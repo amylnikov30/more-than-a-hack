@@ -773,3 +773,73 @@ centroid.
   late (EVALUATION.md), a 2 s lag is costly unless corrected by a constant shift.
 - Is the change-detection AUC near 0.5 at short windows (as on Sample Game 3)? Then reversals
   only help at the scale of several seconds.
+
+### Contested ball (`poss_contested.py`)
+
+**Question.** When the nearest team to the ball flips back and forth, is a turnover happening,
+or just a contest? If contested play looks different around real turnovers than around loose
+balls that change nothing, it can *suppress* false changes in the model. Also reports the
+nearest-team signal itself, the organisers' baseline, for comparison with every other signal.
+
+**Definitions.** Nearest team: the team of the nearest player (referees excluded) to the
+interpolated ball, on live frames with a ball. A flip is a change of nearest team between
+consecutive frames of a live run. Flip density: the flip indicator averaged over a centred
+window, in flips per second; contested: at least two flips within `--flip-window-s`. Contexts:
+`around_change` (within `--context-s` of a label change), `loose_no_change` (within
+`--context-s` of a `CHALLENGE` or `BALL LOST` event with no label change within
+`--loose-gap-s`; reference game only, NaN on the match), `mid` (more than `--mid-margin-s` from
+all of these and from live-run edges). Per context: frames, mean flip rate, contested share.
+Separation rows: `nearest_team` (+1 home nearest, -1 away) as in "Separation and timing";
+`contested_change` (AUC of the density for around-change vs mid frames) and `contested_loose`
+(around-change vs loose-no-change frames) per window.
+
+**Defaults and why** (norms, not tuned). `--flip-window-s 2`: a challenge and its rebound.
+`--context-s 1.5`: the duel that decides a turnover. `--loose-gap-s 3`: a contest with no change
+for 3 s on either side changed nothing. `--mid-margin-s 5`: well clear of both.
+
+**CSV schema** (`poss_contested_summary.csv`), after the shared rows (params add flip_window,
+context, loose_gap, mid_margin):
+
+| analysis | scope | bin | metric | unit |
+|---|---|---|---|---|
+| coverage | nearest_team | | share | share of live frames |
+| flips | all | | n, per_min | count, per live minute |
+| contexts | anchors | | n_changes, n_loose | count |
+| contexts | all / around_change / loose_no_change / mid | | frames, flip_rate, contested_share | frames, flips per s, share |
+| separation | nearest_team | window s | auc, auc_defined, coverage | AUC, share |
+| separation | contested_change / contested_loose | window s | auc | AUC (around change vs mid / vs loose) |
+
+**Tests.** `tests/test_poss_contested.py`: the context frames by hand (loose anchors within 3 s
+of a change dropped; none with pseudo-labels), and nearest team, flips, context rates and
+contested shares and the nearest-team AUC against an independent per-frame recomputation. That
+check exposed an exact tie (the loose ball midway between two players, broken differently in
+float32 and float64); the fixture's loose ball now alternates between 30% and 70% of the way,
+a planted contest without a change.
+
+**Results on Sample Game 3.**
+
+| | clean | degraded |
+|---|---|---|
+| nearest-team AUC at 0 / 2 / 10 s | 0.794 / 0.923 / 0.955 | 0.750 / 0.864 / 0.919 |
+| flips per live minute | 36.8 | 23.2 |
+| flip rate (flips/s): around change / loose, no change / mid | 0.95 / 0.82 / 0.43 | 0.93 / 0.87 / 0.44 |
+| contested share: around change / loose / mid | 0.54 / 0.50 / 0.31 | 0.39 / 0.42 / 0.23 |
+| AUC around change vs mid, at 0 / 2 / 10 s | 0.510 / 0.710 / 0.804 | 0.509 / 0.666 / 0.749 |
+| AUC around change vs loose, at 0 / 2 / 10 s | 0.502 / 0.549 / 0.596 | 0.500 / 0.517 / 0.586 |
+
+Contested play is twice as frequent around turnovers as mid-possession, but almost as frequent
+around loose balls that change nothing: it says "something is happening", not "possession
+changed". It cannot suppress false changes on its own; at best it can tell the model where a
+change is *possible*. The nearest team itself is a strong holding signal once smoothed (0.92 at
+10 s on the degraded copy); its weakness, as the baseline's spellF1 shows, is that raw flips
+create many false possessions, which is exactly what smoothing, the duration prior and the
+signals above have to fix.
+
+**Questions for interpretation.**
+- On the match, is the flip rate around pseudo-label changes above the mid rate, as here? If
+  not, the pseudo-label change times are too vague to compare (check against the reference
+  game).
+- How does the nearest-team AUC at 10 s compare with width / hull (`poss_shape.py`)? The two
+  are independent (ball vs no ball) and a model can combine them.
+- Flips per minute on the match against the reference game: many more means the ball track
+  jumps between players and the nearest team needs heavier smoothing.

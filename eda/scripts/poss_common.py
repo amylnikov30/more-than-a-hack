@@ -320,6 +320,20 @@ def possessions(labels, live, blocks):
     return out
 
 
+def rolling_sum(values, live, blocks, half_width):
+    """Sum of `values` (NaN as 0) over [f - h, f + h] inside f's live run; NaN off live."""
+    values = np.nan_to_num(np.asarray(values, dtype=float))
+    out = np.full(len(values), np.nan)
+    for r in live_runs(live, blocks):
+        seg = values[r["start"]:r["end"] + 1]
+        cs = np.concatenate([[0.0], np.cumsum(seg)])
+        i = np.arange(len(seg))
+        lo = np.maximum(i - half_width, 0)
+        hi = np.minimum(i + half_width, len(seg) - 1) + 1
+        out[r["start"]:r["end"] + 1] = np.round(cs[hi] - cs[lo], 9)
+    return out
+
+
 def window_mask(frames, n, half_width, live):
     """bool (n,): live frames within half_width frames of any of `frames`."""
     out = np.zeros(n, dtype=bool)
@@ -649,6 +663,7 @@ def load_context(args, parser, need_players=True):
 
     labels = np.zeros(n, dtype=np.int8)
     ref_dead = None
+    evs = None
     label_source = "none"
     if events:
         evs = pr.read_events(events, args.fps)
@@ -703,7 +718,7 @@ def load_context(args, parser, need_players=True):
             "teams": teams, "ball": trk["ball"], "players": trk["players"],
             "team": trk["team"], "ball_interp": ball_i, "flag": flag, "dirs": dirs,
             "dir_source": dir_source, "dir_agree": dir_agree, "degraded": degraded,
-            "args": args}
+            "events": evs, "args": args}
 
 
 def params_rows(ctx, extra=()):

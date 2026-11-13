@@ -581,7 +581,8 @@ POSS_BALL_NAN = [(0, 29), (150, 152), (250, 261), (400, 449), (480, 555), (1000,
                  (1100, 1112), (1300, 1424), (1990, 1999)]
 # Ball schedule, inclusive video frames: ("hold", slot) = 0.5 m in +x of the slot;
 # ("pass", a, b) = straight line from the hold point of a on first - 1 to that of b on
-# last + 1; ("loose", a, b) = midway between two players.
+# last + 1; ("loose", a, b) = between two players, 30% of the way from a to b on even
+# frame pairs and 70% on odd ones (f // 2 even / odd), so the nearest team flips.
 POSS_BALL = [
     (0, 89, ("hold", 4)), (90, 99, ("pass", 4, 2)), (100, 174, ("hold", 2)),
     (175, 189, ("pass", 2, 3)), (190, 209, ("hold", 3)), (210, 224, ("pass", 3, 5)),
@@ -706,7 +707,8 @@ def poss_ball(f):
         return _poss_hold(f, spec[1])
     if spec[0] == "loose":
         (x1, y1), (x2, y2) = poss_player(f, spec[1]), poss_player(f, spec[2])
-        return (x1 + x2) / 2.0, (y1 + y2) / 2.0
+        t = 0.3 if (f // 2) % 2 == 0 else 0.7
+        return x1 + (x2 - x1) * t, y1 + (y2 - y1) * t
     (x1, y1), (x2, y2) = _poss_hold(a - 1, spec[1]), _poss_hold(b + 1, spec[2])
     t = (f - a + 1) / float(b - a + 2)
     return x1 + (x2 - x1) * t, y1 + (y2 - y1) * t

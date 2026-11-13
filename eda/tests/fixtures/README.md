@@ -700,7 +700,9 @@ B1 0 m -> `0-0.1`; B2 5 x 0.034 = 0.17 m -> `0.1-0.25`; B3 0.68 m -> `0.5-1`; B4
   points (`POSS_BALL`). Planted: a 3 s home carry (slot 2, 100-174), a home pass chain
   2 -> 3 -> 5 -> 4 (175-244), an intercepted pass 4 -> away 8 (280-299), an away touch without
   control (away 7 holds the ball 700-729 and passes it to home 5, 730-739; the events keep home
-  in possession), and a loose ball between home 3 and away 10 (1200-1210).
+  in possession), and a contested loose ball between home 3 and away 10 (1200-1210: 30% of the
+  way from home 3 to away 10 on frames with f // 2 even, 70% on the others, so the nearest
+  team flips every two frames while away keeps possession).
 
 | | frames (video, inclusive) |
 |---|---|
@@ -927,8 +929,8 @@ K12 1055-1099 A9 and K13 1118-1199 A9 (merged: same slot, 1055-1199), K14 1216-1
 K15 1430-1989 H2. 14 contacts after merging.
 
 **Passes.** K1 -> K2, K2 -> K3, K3 -> K4, K4 -> K5 (home; flights of 20 to 67 m/s, gaps of
-0.2 to 0.64 s); K6 -> K7 (away); K12/13 -> K14 (away; the ball jumps to the loose-ball
-midpoint, over 80 m/s). Not passes: K5 -> K6 (other team), K7 -> K8 (the whole flight
+0.2 to 0.64 s); K6 -> K7 (away); K12/13 -> K14 (away; the ball jumps about 16 m to the loose
+ball, over 80 m/s). Not passes: K5 -> K6 (other team), K7 -> K8 (the whole flight
 400-449 is missing and 450-454 have no ball at f - 5, so no speed is defined), K9 -> K10 and
 K10 -> K11 (other team); K8 -> K9 and K11 -> K12 cross a dead stretch. 6 passes: home 4, away 2.
 
@@ -1087,3 +1089,27 @@ Profile (events, gainer's frame): before both changes -1; bin [0, 1 s) = (-1 - 0
 0.2 + 0.6 + 20 x 1) / 25 = 0.76 for each change; +1 after. Bins -10 .. -1: -1 (bin -10 counts
 20 + 25 = 45 frames: 50-54 have no velocity); bin 0: 0.76; bins 1 .. 9: +1 (bins 8 and 9 count
 only the 1400 change's 25 frames each: 500-549 are dead). The same for both teams.
+
+## Expected: `poss_contested.py`
+
+**Rules (decided before coding).** Nearest team on a live frame with the (interpolated) ball:
+the team of the nearest player of either team (referees excluded); undefined without a ball.
+A flip is a frame whose nearest team differs from the previous frame's, both defined and in the
+same live run. Flip density at window w: the flip indicator (1 on flips, 0 on other defined
+frames) averaged over the centred window, in flips per second (x fps). Contested: at least 2
+flips within the `--flip-window-s` (2 s, h = 25) window around the frame. Contexts on live
+frames: `around_change` within `--context-s` (1.5 s = 38 frames, rounded) of a label change;
+`loose_no_change` within 1.5 s of a `CHALLENGE` or `BALL LOST` event (events only) with no label
+change within `--loose-gap-s` (3 s) of it; `mid` more than `--mid-margin-s` (5 s) from every
+change, loose anchor and live-run edge. Per context: frames with a defined density, mean flips
+per second, contested share. Separation rows: `nearest_team` (+1 home nearest, -1 away) as for
+carries (the organisers' baseline); `contested_change`: AUC of the density for around-change vs
+mid frames; `contested_loose`: around-change vs loose-no-change frames (can it tell a turnover
+from a contest that changes nothing?).
+
+**By hand.** Changes 300 and 1400 (events). Loose anchors: `BALL LOST` 280 and 1380 are within
+3 s of a change, so dropped; the two `CHALLENGE` events at 700 and the one at 1200 stay
+(`loose_no_change` = 662-738 and 1162-1238). `around_change` = 262-338 and 1362-1438. With tags
+(no events) `loose_no_change` is empty (NaN rows) and the changes are 310 and 1410. Everything
+else (nearest team, flips, densities, context means, contested shares and the window-0 AUCs) is
+checked against an independent per-frame recomputation from the fixture text in the test.
