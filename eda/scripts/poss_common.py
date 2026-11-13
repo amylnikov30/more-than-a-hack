@@ -406,14 +406,9 @@ def rolling_mean(values, live, blocks, half_width):
 def rankdata(x):
     """Ranks 1..n with ties given their average rank."""
     x = np.asarray(x, dtype=float)
-    order = np.argsort(x, kind="mergesort")
-    xs = x[order]
-    edges = np.concatenate([[True], xs[1:] != xs[:-1], [True]])
-    starts = np.flatnonzero(edges)
-    ranks = np.empty(len(x))
-    for a, b in zip(starts[:-1], starts[1:]):
-        ranks[order[a:b]] = (a + b + 1) / 2.0
-    return ranks
+    _, inv, cnt = np.unique(x, return_inverse=True, return_counts=True)
+    avg = np.cumsum(cnt) - (cnt - 1) / 2.0
+    return avg[inv.ravel()]
 
 
 def auc(score, positive):
@@ -428,17 +423,19 @@ def auc(score, positive):
     return float((r[positive].sum() - n1 * (n1 + 1) / 2.0) / (n1 * n0))
 
 
-def window_separation(score, labels, live, blocks, windows_s, fps=FPS):
+def window_separation(score, labels, live, blocks, windows_s, fps=FPS, subset=None):
     """{window_s: (auc, auc_defined, coverage)} for "home has the ball" over labelled live
     frames. score: per frame, NaN where the signal is absent. auc treats absent as 0 (no
     evidence), auc_defined uses only frames with a defined smoothed score, coverage is the
-    share of live frames with one. Window 0 is the frame itself."""
+    share of live frames with one. Window 0 is the frame itself. `subset` (bool per frame)
+    restricts the frames scored and counted, not the frames the window averages over."""
     out = {}
-    lab = (labels != NONE) & live
-    n_live = int(live.sum())
+    sub = live if subset is None else (live & subset)
+    lab = (labels != NONE) & sub
+    n_live = int(sub.sum())
     for w in [0.0] + [float(v) for v in windows_s]:
         s = rolling_mean(score, live, blocks, int(round(w * fps / 2.0)))
-        defined = np.isfinite(s) & live
+        defined = np.isfinite(s) & sub
         pos = labels == H
         a = auc(np.where(defined, s, 0.0)[lab], pos[lab])
         m = lab & defined

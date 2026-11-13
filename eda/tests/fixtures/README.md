@@ -945,3 +945,61 @@ changes matched. With `--min-chain 1`: switch at 305 (away; the K12/13-K14 chain
 of its run), change 300 matched with error +0.2 s, event precision 1 / 1.
 
 **Tags.** Chains of at least 2: labelled frames 60-279 (220), precision 1.0.
+
+## Expected: `poss_shape.py`
+
+**Rules (decided before coding).** Per team and live frame, over its present players (team 0 or
+1, x and y finite), in the team's attacking frame (x toward the opponent goal, `toward_goal`):
+the deepest player (smallest attacking-frame x) is taken as the goalkeeper and dropped; the
+features use the rest ("outfield"), and need at least `--min-players` (3) of them, else NaN.
+`width` = y range; `length` = attacking-frame x range; `hull_area` = convex hull area (m^2);
+`centroid_advance` = mean attacking-frame x; `centroid_velocity` = its backward difference over
+`--lag` inside the live run (m/s); `line_depth` = attacking-frame x of the deepest outfield
+player (metres from the own goal line); `goal_side` = share of outfield players with
+attacking-frame x below the ball's (interpolated ball), or below the opponent outfield
+centroid's when the ball is missing. Hypothesis: the possessing team has the larger value, except
+`goal_side` (the smaller). Score toward "home has the ball" = sign x (home - away), sign +1, or
+-1 for `goal_side`. `diff` rows: possessing minus defending team, on labelled live frames with
+both values defined (mean, median, n), for all frames, ball present (observed or interpolated)
+and ball missing. Separation per window as for carries, computed three times: over all
+labelled live frames, those with the ball present, and those with it missing (the split uses the
+frame's own ball flag; the window may mix both). `line_depth` quantiles per team on labelled
+frames where that team defends, and where it attacks.
+
+**Frame 200** (home has the ball, half 1, home centroid 46 m, away 56 m, home width scale 1,
+away 0.6; the ball 0.5 m in front of home 3 at (40, 49), so at (40.5, 49)). Home outfield
+(40, 19), (40, 49), (52, 26), (52, 42): width 30, length 12, hull 276, advance 46, velocity +1,
+line depth 40, goal side 2 of 4 = 0.5. Away outfield (50, 25), (50, 43), (62, 29.2),
+(62, 38.8), attacking-frame x 55, 55, 43, 43: width 18, length 12, hull 165.6, advance 49,
+velocity -1, line depth 43, goal side 4 of 4 = 1.0 (the ball is at 64.5 in their frame).
+Scores: width +12, length 0, hull +110.4, advance -3, velocity +2, line depth -3, goal side
++0.5.
+
+**Frame 420** (away has the ball, ball missing, home centroid 45.2 m, away 55.2 m): goal side
+uses the opponent centroid; every outfield player of both teams is goal-side of it (home x
+39.2 and 51.2 below 55.2; away attacking-frame x 55.8 and 43.8 below 59.8): 1.0 and 1.0,
+score 0.
+
+**Coverage.** Every feature is defined on all 1,850 live frames (all players tracked), except
+`centroid_velocity`, which needs the frame 5 earlier in the same live run: undefined on the
+first 5 frames of each of the 3 live runs, 1835 / 1850 = 0.992. Positions are written with 5
+decimals, so values match within 0.01 m, and hull areas within 0.05 m^2.
+
+**Width and hull.** Off the ramps the possessing team's width is 30 and the defender's 18
+(hull 276 and 165.6), so possessing minus defending is +12 (+110.4). On the 75 ramp frames
+(three ramps of 25 after 300, 550 and 1400) it is -12 + 0.96 k, k = 0..24, for both label
+sources. `diff` width: mean (1775 x 12 + 75 x -0.48) / 1850 = 11.494, median 12; hull: mean
+105.75, median 110.4. Length: possessing minus defending is 0 up to position rounding (median
+0 within 0.01 m). Window-0 `auc` for width (events): home frames 1,250 at +12 and 2 x 25 ramp
+values -12 + 0.96 j; away frames 525 at -12 and 25 ramp values 12 - 0.96 k. Wins 1250 x 549 +
+24 x 2 x 525 + 2 x 276 = 712,002 (276 pairs with j + k > 25), ties 1250 + 2 x 525 + 2 x 24 =
+2,348 (equal values, which position rounding may break either way): `auc` = (712002 + 1174) /
+715000 = 0.9974, within +-0.0017.
+
+**Line depth** (events labels; numpy linear quantiles of the analytic values): home
+defending (550 frames: 44 - 0.04 i, i < 200, and 39 - 0.04 j, j < 350): p25 30.53, p50 36.02,
+p75 38.76 m. Away defending (1,300 frames: 49 - 0.04 i, i < 250; 47 - 0.04 i, i < 450; 58 -
+0.04 i, i < 600): p25 38.03, p50 42.68, p75 47.01 m. Home attacking (34 + 0.04 i, i < 250;
+36 + 0.04 i, i < 450; 25 + 0.04 i, i < 600): p25 35.99, p50 40.32, p75 44.97 m. Away attacking
+(39 + 0.04 i, i < 200; 44 + 0.04 j, j < 350): p25 44.24, p50 46.98, p75 52.47 m. Within 0.01 m
+(position rounding).

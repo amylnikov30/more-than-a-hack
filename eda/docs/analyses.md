@@ -568,3 +568,66 @@ turnover in ten.
 - Does precision rise with chain length? If not (as on Sample Game 3), `--min-chain 1` buys
   coverage at no cost.
 - Chain switches are rare and late: use chains to hold a label, not to place a change.
+
+### Team shape (`poss_shape.py`)
+
+**Question.** Does the team in possession spread out, push up and keep fewer players behind the
+ball, clearly enough to tell who has the ball without seeing it? Feeds the ball-free part of the
+emission model, the part that must carry the 40% of live play without a ball.
+
+**Definitions.** Per team and live frame, in the team's attacking frame (x toward the opponent
+goal), over its present players minus the deepest one (taken as the goalkeeper; "outfield"),
+with at least `--min-players` (3) of them: `width` (y range), `length` (x range), `hull_area`
+(convex hull, m^2), `centroid_advance` (mean x), `centroid_velocity` (its change over `--lag`
+inside the live run), `line_depth` (x of the deepest outfield player = metres from the own goal
+line), `goal_side` (share of outfield players behind the ball, or behind the opponent outfield
+centroid when the ball is missing). Hypothesis: the possessing team has the larger value, except
+`goal_side` (smaller); the score toward "home has the ball" is that sign times home minus away
+(`hypothesis` rows hold the sign). `diff`: possessing minus defending, raw (mean, median, n).
+Separation as in "Separation and timing", three times: over all labelled live frames (`:all`),
+those with the ball present (`:ball`, observed or interpolated) and those without (`:no_ball`);
+the split uses the frame's own ball flag, the window may average over both. `line_depth` p25 /
+p50 / p75 per team when it defends and when it attacks.
+
+**CSV schema** (`poss_shape_summary.csv`), after the shared rows (params add min_players):
+
+| analysis | scope | bin | metric | unit |
+|---|---|---|---|---|
+| coverage | feature | | share | share of live frames (both teams defined) |
+| hypothesis | feature | | sign | +1 possessing larger, -1 smaller |
+| diff | feature | all / ball / no_ball | mean, median, n | feature unit, frames |
+| separation | `<feature>:<split>` | window s | auc, auc_defined, coverage | AUC, share |
+| line_depth | `H:defending` / `H:attacking` / `A:...` | `` / p25 / p50 / p75 | n, depth | frames, m from own goal line |
+
+**Tests.** `tests/test_poss_shape.py`: every feature on two frames (one with the ball, one
+without), the hull, coverage, width and hull differences, the width AUC, line-depth quantiles
+per team and state, pseudo-labels, `--degrade`.
+
+**Results on Sample Game 3** (AUC at the frame / best window, all frames; then no-ball frames of
+the degraded copy at that window):
+
+| feature | median poss - def (clean) | clean | degraded | degraded, no ball |
+|---|---|---|---|---|
+| width | +15.9 m | 0.919 / 0.923 (10 s) | 0.918 / 0.923 | 0.916 |
+| hull_area | +524 m^2 | 0.920 / 0.922 (5 s) | 0.918 / 0.922 | 0.919 |
+| length | +4.6 m | 0.838 / 0.847 (10 s) | 0.835 / 0.847 | 0.844 |
+| goal_side | -0.4 | 0.815 / 0.850 (10 s) | 0.790 / 0.858 | 0.845 |
+| centroid_velocity | +0.6 m/s | 0.642 / 0.647 (5 s) | 0.599 / 0.647 | 0.653 |
+| centroid_advance | +8.3 m | 0.606 / 0.620 (10 s) | 0.606 / 0.621 | 0.606 |
+| line_depth | +1.5 m | 0.505 / 0.523 (10 s) | 0.506 / 0.524 | 0.509 |
+
+Width and hull area separate the teams at about 0.92 on every frame, with or without the ball,
+and need no smoothing: they are the strongest ball-free signal so far. (The clean game's no-ball
+frames are only 0.4% of live play, so its no-ball column is not shown.) Line depth hardly
+differs: both Sample Game 3 teams hold their line about 33-35 m from goal whether attacking or
+defending, so there is no low block there.
+
+**Questions for interpretation.**
+- Do width and hull area keep an AUC near 0.9 against the match pseudo-labels? If so they
+  are the backbone of the ball-free emission; check `:no_ball` especially.
+- Is Athletic's line depth when defending well below Barcelona's? That is the "low block"
+  assumption, tested rather than assumed; if both are similar, a model must not rely on it.
+- Is `centroid_advance` weak (as on Sample Game 3) because both teams move together? Then
+  position on the pitch says little about possession, and `poss_ball_field.py` should confirm it.
+- Does `centroid_velocity` peak at a short window? It is a change signal (see
+  `poss_reversal.py`), not a holding signal.
