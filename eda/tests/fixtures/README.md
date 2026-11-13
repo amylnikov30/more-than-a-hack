@@ -1003,3 +1003,39 @@ p75 38.76 m. Away defending (1,300 frames: 49 - 0.04 i, i < 250; 47 - 0.04 i, i 
 36 + 0.04 i, i < 450; 25 + 0.04 i, i < 600): p25 35.99, p50 40.32, p75 44.97 m. Away attacking
 (39 + 0.04 i, i < 200; 44 + 0.04 j, j < 350): p25 44.24, p50 46.98, p75 52.47 m. Within 0.01 m
 (position rounding).
+
+## Expected: `poss_ball_field.py`
+
+**Rules (decided before coding).** Scores toward "home has the ball", in home's attacking
+frame (x toward the away goal), NaN where undefined:
+- `ball_position`: interpolated ball x minus half the pitch length (positive = ball in the away
+  half).
+- `ball_direction`: the sign of the ball's x velocity (backward difference over `--lag` inside
+  the live run), NaN when |vx| < `--min-ms` (0.5 m/s).
+- `team_drift`: +1 when both teams' outfield centroids (as in `poss_shape.py`) move toward the
+  away goal at `--min-ms` or more, -1 when both move toward the home goal at that speed, NaN
+  otherwise.
+Separation per window as for carries. `thirds`: for each team T, labelled live frames with the
+ball present, by the ball's third in T's attacking frame (`defensive` [0, 35), `middle`
+[35, 70), `attacking` [70, 105]; x outside the pitch clipped), the share where T has the ball.
+
+**Team drift (by hand).** Both centroids move together at 1 m/s: toward the away goal (home's
+frame) on 50-299, 550-999 and 1400-1999, toward the home goal on 300-499 and 1050-1399. The
+velocity over 5 frames is NaN on the first 5 frames of each live run (50-54, 550-554, 1050-1054)
+and, around each reversal, takes the values 1, 0.6, 0.2, -0.2, -0.6, -1: in home's frame
++1, +0.6, +0.2, -0.2, -0.6 on frames 300-304, and -1, -0.6, -0.2, +0.2, +0.6 on 1400-1404. So
+300-301 score +1 under away labels, 1400-1401 score -1 under home labels, and 302-303, 1402-1403
+are NaN. Window 0: home frames 1,300 = 1,286 at +1, 12 at 0 (NaN), 2 at -1; away frames 550 =
+541 at -1, 7 at 0, 2 at +1. `auc` = (1286 x 548 + 12 x 541 + 0.5 x (1286 x 2 + 12 x 7 + 2 x 541))
+/ 715000 = 713089 / 715000 = 0.9973; `auc_defined` = (1286 x 541 + 0.5 x (1286 x 2 + 2 x 541))
+/ (1288 x 543) = 697553 / 699384 = 0.9974; coverage 1831 / 1850 = 0.9897.
+
+**Spot values.** Frame 200 (ball at x 40.5, moving with home 3): `ball_position` -12,
+`ball_direction` +1, `team_drift` +1. Frame 420 (ball missing, away possession):
+`ball_position` and `ball_direction` NaN, `team_drift` -1. Frame 1500 (half 2, home attacks -x,
+ball 0.5 m in front of home 2 at x = cA + 4.5 with cA = 60): ball x in home's frame 105 - 64.5
+= 40.5, `ball_position` -12; the ball moves -1 m/s in absolute x, +1 in home's frame.
+
+**Ball position, ball direction, thirds.** Continuous in the fixture, so the test recomputes
+them from the fixture text with a plain per-frame loop (its own parser, interpolation of the two
+short gaps 150-152 and 250-261, and a pairwise AUC count) and requires exact agreement.

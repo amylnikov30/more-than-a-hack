@@ -388,6 +388,9 @@ def rolling_mean(values, live, blocks, half_width):
     live frames."""
     values = np.asarray(values, dtype=float)
     out = np.full(len(values), np.nan)
+    if half_width <= 0:      # exact values: cumulative-sum differences would break ties
+        out[live] = values[live]
+        return out
     for r in live_runs(live, blocks):
         seg = values[r["start"]:r["end"] + 1]
         ok = np.isfinite(seg)
@@ -400,7 +403,8 @@ def rolling_mean(values, live, blocks, half_width):
         with np.errstate(invalid="ignore", divide="ignore"):
             out[r["start"]:r["end"] + 1] = np.where(count > 0, (cs[hi] - cs[lo]) / count,
                                                     np.nan)
-    return out
+    # cumulative sums leave ~1e-12 noise; rounding keeps equal means equal (ties for the AUC)
+    return np.round(out, 9)
 
 
 def rankdata(x):

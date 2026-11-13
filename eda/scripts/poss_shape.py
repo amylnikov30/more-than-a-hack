@@ -71,8 +71,9 @@ def direction_by_frame(dirs, half_of, t):
     return out
 
 
-def team_features(ctx, min_players=MIN_PLAYERS):
-    """{team: {feature: float (n,)}} plus 'cx' (outfield mean x, absolute) and 'mask'."""
+def team_features(ctx, min_players=MIN_PLAYERS, hull=True):
+    """{team: {feature: float (n,)}} plus 'cx' (outfield mean x, absolute) and 'mask'.
+    hull=False skips the per-frame hull loop (hull_area all NaN)."""
     players, team, live = ctx["players"], ctx["team"], ctx["live"]
     length = ctx["pitch"][0]
     n = ctx["n"]
@@ -97,7 +98,7 @@ def team_features(ctx, min_players=MIN_PLAYERS):
         for key in f:
             f[key] = np.where(ok, f[key], np.nan)
         area = np.full(n, np.nan)
-        for i in np.flatnonzero(ok):
+        for i in (np.flatnonzero(ok) if hull else ()):
             sel = m[i]
             area[i] = hull_area(x[i, sel].tolist(), y[i, sel].tolist())
         f["hull_area"] = area

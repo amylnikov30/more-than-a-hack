@@ -631,3 +631,61 @@ defending, so there is no low block there.
   position on the pitch says little about possession, and `poss_ball_field.py` should confirm it.
 - Does `centroid_velocity` peak at a short window? It is a change signal (see
   `poss_reversal.py`), not a holding signal.
+
+### Ball position vs ball direction vs team drift (`poss_ball_field.py`)
+
+**Question.** Which tells who has the ball better: where the ball is, which way it moves, or
+which way both teams drift? If ball position underperforms the two direction signals, it is
+confounded (high pressing, build-up from the back and clearances all put the ball in one team's
+half while the other has it). Feeds the choice of position vs direction features in the model.
+
+**Definitions.** Scores toward "home has the ball", in home's attacking frame:
+`ball_position` = interpolated ball x minus half the pitch length (positive = away half);
+`ball_direction` = sign of the ball's x velocity over `--lag`, NaN below `--min-ms`;
+`team_drift` = +1 / -1 when both teams' outfield centroids (as in `poss_shape.py`) move toward
+the away / home goal at `--min-ms` or more, NaN otherwise (no ball needed). Separation per
+window as in "Separation and timing". `thirds`: per team, labelled ball-present live frames by
+the ball's third of the pitch in that team's attacking frame (`defensive` [0, 35), `middle`,
+`attacking` [70, 105] m), and the share where that team has the ball.
+
+**Defaults and why.** `--min-ms 0.5`: below it a direction is position jitter or a standing
+team (a norm, not tuned).
+
+**CSV schema** (`poss_ball_field_summary.csv`), after the shared rows (params add min_ms):
+
+| analysis | scope | bin | metric | unit |
+|---|---|---|---|---|
+| coverage | ball_position / ball_direction / team_drift | | share | share of live frames |
+| separation | signal | window s | auc, auc_defined, coverage | AUC, share |
+| thirds | `H:defensive` ... `A:attacking` | | n, share_team_has_ball | frames, share |
+
+**Tests.** `tests/test_poss_ball_field.py`: team drift by hand (the reversal frames around each
+turnover), spot values on three frames, and ball position, ball direction and thirds against an
+independent per-frame recomputation from the fixture text (exact agreement). That check found
+that the rolling mean's cumulative sums broke exact ties; the frame window now uses the values
+themselves and smoothed means are rounded to 1e-9.
+
+**Results on Sample Game 3** (AUC at the frame / at 10 s):
+
+| signal | clean coverage | clean | degraded coverage | degraded |
+|---|---|---|---|---|
+| ball_position | 0.997 | 0.386 / 0.396 | 0.603 | 0.426 / 0.409 |
+| ball_direction | 0.880 | 0.647 / 0.703 | 0.510 | 0.610 / 0.657 |
+| team_drift | 0.637 | 0.618 / 0.597 | 0.551 | 0.604 / 0.607 |
+
+Share of ball-present frames on which a team has the ball, by the ball's third in its attacking
+frame (clean): home 0.672 / 0.513 / 0.394 and away 0.606 / 0.487 / 0.328 (defensive / middle /
+attacking). On Sample Game 3 ball position is *reversed*: a team has the ball more often when
+the ball is in its own third (build-up from the back, the keeper, the other team's attack ending
+in a clearance) than in the opponent's. As a score it carries some information (0.61 if flipped),
+but in the opposite direction from the naive reading and only weakly. Ball direction and team
+drift are both weak (0.60-0.70) and need long windows; neither reaches the 0.75 bar. Team drift
+is a change signal more than a holding signal: see `poss_reversal.py`.
+
+**Questions for interpretation.**
+- Is ball position on the match also below 0.5? If Barcelona press high and Athletic sit deep,
+  the confound may differ by team: compare the two teams' `thirds` rows.
+- Does ball direction beat ball position at every window? Then the model should use direction
+  (or position only together with the team that has just touched it).
+- Team drift with a low AUC and a coverage near 0.6 says both teams moving together happens
+  often but does not by itself say who has the ball.
