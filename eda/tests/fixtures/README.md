@@ -674,3 +674,161 @@ B1 0 m -> `0-0.1`; B2 5 x 0.034 = 0.17 m -> `0.1-0.25`; B3 0.68 m -> `0.5-1`; B4
 **Unchanged.** On `fixture_speed_atd.*` every existing row is identical, and with the default
 1 s window (25 frames) there are no displacement windows (12 frames): every share is NaN and
 `n_frames` 0.
+
+# Possession fixture (`poss_*.py`)
+
+`fixture_poss_atd.txt` / `.xml` (2,000 frames, frame_id 1..2000 = video 0..1999), with
+`fixture_poss_events.json` (true labels, open Metrica events format),
+`fixture_poss_tags.xml` (Smart Tagging pseudo-labels) and `fixture_poss_dead.csv` (the
+`deadball.run` output format: `frame,dead,p_dead,llr_dead`). Built by `make_fixtures.py`
+(`POSS_*` constants). Run with `--frames 0-999,1000-1999 --pitch 105 68`.
+
+## Design
+
+- **Slots.** 11 groups of `x,y` (no speed field, like Sample Game 3): slots 1-5 home `T1`
+  "Alpha FC" (slot 1 the goalkeeper), 6-10 away `T2` "Beta Club" (slot 6 the goalkeeper),
+  slot 11 a referee (`teamId="REF"`, not a `<Team>`). The metadata declares
+  `attack_direction_first_half`: T1 `left_to_right`, T2 `right_to_left`.
+- **Movement.** Goalkeepers stand at x = 5 / 100 m (swapped in half 2), y = 34. Each team's
+  four outfielders sit at the team centroid plus (dx, dy) = (-6, -15), (-6, 15), (6, -8),
+  (6, 8) m, dy times a width scale: 1.0 for the team in possession, 0.6 for the other, ramped
+  linearly over 25 frames after 300, 550 and 1400. Home outfield centroid x (half 1): 40 m
+  until 50, +1 m/s to 50 m at 300, -1 m/s to 42 m at 500, still to 549, +1 m/s from 550. Away =
+  home + 10 m. Half 2: away centroid 50 m until 1050, +1 m/s to 64 m at 1400, -1 m/s after;
+  home = away + 10 m. Referee at the midpoint of the two centroids, y = 60.
+- **Ball.** Held 0.5 m in +x of a player, or in flight on a straight line between two hold
+  points (`POSS_BALL`). Planted: a 3 s home carry (slot 2, 100-174), a home pass chain
+  2 -> 3 -> 5 -> 4 (175-249), an intercepted pass 4 -> away 8 (280-299), a loose ball between
+  home 5 and away 7 (700-709) and between home 3 and away 10 (1200-1210).
+
+| | frames (video, inclusive) |
+|---|---|
+| dead | 0-49 (before the kick-off), 500-549 (ball out by away, throw-in by home at 550), 1000-1049 (before the second kick-off) |
+| home `H` | 50-299, 550-999, 1400-1999 |
+| away `A` | 300-499, 1050-1399 |
+| ball missing | 0-29, 150-152, 250-261, 400-449, 480-555, 1000-1039, 1100-1112, 1300-1424, 1990-1999 |
+
+**Events** (`POSS_EVENTS`, video frames; the JSON stores `frame_id` = video + 1): kick-off T1
+at 50; passes and a carry by T1; `BALL LOST` T1 280-300 then `RECOVERY` T2 at 300; T2 passes;
+`BALL OUT` T2 480-500; `CARD` T2 at 520; `SET PIECE / THROW IN` T1 at 550; a ground challenge
+won by T1 and lost by T2 at 700; a T1 carry 710-760. Half 2: kick-off T2 at 1050; an aerial
+challenge won by T2 at 1200; `BALL LOST` T2 1380-1400 then `RECOVERY` T1 at 1400; a T1 carry.
+
+**Tags** (`POSS_TAGS`, frames, end exclusive; team names in the tags are "Alpha" and "Beta
+Club", so the map to the metadata names "Alpha FC" / "Beta Club" goes through shared tokens):
+
+| code | frames | team | pseudo-label |
+|---|---|---|---|
+| `build up` (lower case) | 60-290 | Alpha | H |
+| DEFENDING IN MIDDLE THIRD | 60-290 | Beta Club | H (the tagged team defends) |
+| PROGRESSION | 310-490 | Beta Club | A |
+| `Long Ball` | 320-360 | Alpha | H: disagrees with PROGRESSION, so 320-359 are dropped |
+| SET PIECES | 540-560 | N/A | ignored |
+| PROGRESSION | 700-750 | N/A | dropped (no team) |
+| DEFENSIVE TRANSITION | 1100-1390 | Alpha | A |
+| ATTACKING TRANSITION | 1410-1600 | Alpha | H |
+| BALL IN THE BOX | 1500-1550 | Alpha | ignored |
+
+## Rules (decided before coding)
+
+**Live mask.** Live = graded and `dead == 0`. From `--dead CSV`: `dead` is 1 dead, 0 live, -1
+not decoded; -1 and frames missing from the CSV are not live. From `--events` (reference game):
+the union of three rules, end exclusive. (1) A restart is a `SET PIECE` event or any event
+with subtype `GOAL KICK`. A half's first restart is preceded by dead frames from the half's
+first graded frame; every later restart by dead frames from the `end` of the last event that
+starts strictly before it (skipping `CARD`) up to the restart's `start`. (2) After `BALL OUT`,
+or a `SHOT` with subtype `OUT`, dead from its `end` to the start of the next event that starts
+later. (3) After an event with subtype `END HALF`, dead to the end of the half. Otherwise
+frames after a half's last event stay live (the `--frames` range ends the half). With both
+`--events` and `--dead`, `--dead` sets the live mask. In this fixture rule (2) adds nothing
+(`BALL OUT` ends at 500, the `CARD` starts at 520, both inside the restart's dead frames).
+Rules (1) with a same-frame `RECOVERY` and a goal kick, (2) without a restart, and (3) are
+unit-tested on small event lists in `test_poss_common.py`.
+
+**True labels (`--events`).** On a live frame, the team of the most recent controlled event
+(`PASS`, `CARRY`, `RECOVERY`, `SHOT`, `SET PIECE`) whose start is on or before it, in the same
+half. `BALL LOST`, `BALL OUT`, `CHALLENGE`, `FAULT RECEIVED` and `CARD` never change it.
+
+**Pseudo-labels (`--tags`).** `PHASE_TO_POSSESSION` maps each code to `has` (the tagged team
+has the ball), `defends` (the other team has it) or `ignore`; codes match case-insensitively.
+`N/A` or unmapped teams are dropped. A live frame gets a label if every mapped tag covering it
+says the same team; frames where they disagree are dropped. Agreement per code: over the
+frames where the code labels and at least one other code labels too, the share where every
+other code gives the same team (NaN when there are none).
+
+**Changes.** A change is the first frame of the other team after a labelled frame of one team,
+with no non-live frame in between (the previous labelled frame is in the same live run). For
+pseudo-labels the previous labelled frame may be any distance back within the run.
+
+**Interpolation.** A live gap (a run of missing ball inside one live run) of at most
+`--max-interp-frames` (12) frames is filled linearly when the ball is observed on both
+neighbours, which must belong to the same live run. A gap touching a live-run edge (a dead
+frame, a half edge) is never filled.
+
+**`poss_ball_live.py`.** Gaps are runs of missing ball inside live runs; bins are half-open
+`[0,0.5) [0.5,2) [2,5) [5,inf)` s on length / fps. "Around changes": live frames within
+`--change-window-s` (2 s = 50 frames) of a change, `|f - change| <= 50`; "rest": the other
+live frames.
+
+## Expected: shared preparation
+
+| | events (`--events`) | dead CSV (`--dead`) |
+|---|---|---|
+| live frames | 1,850 (half 1: 900, half 2: 950) | the same |
+| dead frames | 150 | the same |
+| labels | H 1,300, A 550 on live frames; 5 possessions; changes at 300 and 1400 | (`--tags`) labelled 850, dropped 40; changes at 310 and 1410 |
+
+Slot teams: 5 home, 5 away, 1 other. Attack direction from the metadata: home +x in half 1,
+-x in half 2 (away the opposite); inferred from the centroids over the first 60 s of live
+frames of each half the same (agreement 1). Tag team map: "Alpha" -> home, "Beta Club" ->
+away.
+
+Agreement per code (`--tags`): BUILD UP 230 frames, 1.0; DEFENDING IN MIDDLE THIRD 230, 1.0;
+PROGRESSION 40, 0.0; LONG BALL 40, 0.0; DEFENSIVE TRANSITION and ATTACKING TRANSITION 0,
+NaN; every other code 0, NaN.
+
+## Expected: `poss_ball_live.py`
+
+Live gaps before interpolation (frames, length, bin): 150-152 (3, <0.5), 250-261 (12, <0.5),
+400-449 (50, 2-5), 480-499 (20, 0.5-2; the rest of that raw gap is dead), 550-555 (6, <0.5;
+touches the restart), 1100-1112 (13, 0.5-2), 1300-1424 (125, >=5), 1990-1999 (10, <0.5;
+touches the half end).
+
+| | observed | interpolated | missing |
+|---|---|---|---|
+| all live (1,850) | 1,611 (0.871) | 15 (0.00811) | 224 (0.121) |
+| half 1 (900) | 809 | 15 | 76 |
+| half 2 (950) | 802 | 0 | 148 |
+
+Missing before interpolation: 239 (0.129 of live). Gaps per bin, count / frames / share of
+missing frames:
+
+| | <0.5 s | 0.5-2 s | 2-5 s | >=5 s |
+|---|---|---|---|---|
+| before | 4 / 31 / 0.130 | 2 / 33 / 0.138 | 1 / 50 / 0.209 | 1 / 125 / 0.523 |
+| after | 2 / 16 / 0.0714 | 2 / 33 / 0.147 | 1 / 50 / 0.223 | 1 / 125 / 0.558 |
+
+Gap length quantiles before interpolation (lengths 3, 6, 10, 12, 13, 20, 50, 125 frames; numpy
+linear): p10 5.1 fr = 0.204 s, p50 12.5 fr = 0.5 s, p90 72.5 fr = 2.9 s.
+
+Interpolation cap sensitivity (`--interp-also 6,25`), frames filled: cap 6 -> 3 (only
+150-152; 550-555 has no observed left neighbour); cap 12 -> 15; cap 25 -> 28 (adds 1100-1112;
+480-499 ends at a dead frame).
+
+Dead frames: 150, ball missing on 120 (0.8).
+
+Around changes (2 windows of 101 frames, 202 frames; rest 1,648), missing before / after
+interpolation:
+
+| labels | around | rest |
+|---|---|---|
+| events (changes 300, 1400) | 87 (0.431) / 75 (0.371) | 152 (0.0922) / 149 (0.0904) |
+| tags (changes 310, 1410) | 67 (0.332) / 65 (0.322) | 172 (0.104) / 159 (0.0965) |
+
+Without labels the change rows are NaN with `n_changes` 0.
+
+**`--degrade`** (seed 0): only live frames lose the ball; the missing share of live frames
+reaches at least `--missing-share` and exceeds it by less than one burst; the same seed gives the
+same arrays. Track fragmentation with `--frag-gap-frames 0` keeps, on every frame, the same
+multiset of (team, x, y) over present slots; with the default gap, every lost position is
+within `--frag-gap-frames` frames after a break.

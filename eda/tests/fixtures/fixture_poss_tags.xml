@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="utf-8"?>
+<file>
+  <ALL_INSTANCES>
+    <instance>
+      <ID>1</ID>
+      <start>2.40</start>
+      <end>11.60</end>
+      <code>build up</code>
+      <label>
+        <group>Team</group>
+        <text>Alpha</text>
+      </label>
+      <label>
+        <group>Half</group>
+        <text>1st Half</text>
+      </label>
+    </instance>
+    <instance>
+      <ID>2</ID>
+      <start>2.40</start>
+      <end>11.60</end>
+      <code>DEFENDING IN MIDDLE THIRD</code>
+      <label>
+        <group>Team</group>
+        <text>Beta Club</text>
+      </label>
+      <label>
+        <group>Half</group>
+        <text>1st Half</text>
+      </label>
+    </instance>
+    <instance>
+      <ID>3</ID>
+      <start>12.40</start>
+      <end>19.60</end>
+      <code>PROGRESSION</code>
+      <label>
+        <group>Team</group>
+        <text>Beta Club</text>
+      </label>
+      <label>
+        <group>Half</group>
+        <text>1st Half</text>
+      </label>
+    </instance>
+    <instance>
+      <ID>4</ID>
+      <start>12.80</start>
+      <end>14.40</end>
+      <code>Long Ball</code>
+      <label>
+        <group>Team</group>
+        <text>Alpha</text>
+      </label>
+      <label>
+        <group>Half</group>
+        <text>1st Half</text>
+      </label>
+    </instance>
+    <instance>
+      <ID>5</ID>
+      <start>21.60</start>
+      <end>22.40</end>
+      <code>SET PIECES</code>
+      <label>
+        <group>Team</group>
+        <text>N/A</text>
+      </label>
+      <label>
+        <group>Half</group>
+        <text>1st Half</text>
+      </label>
+      <label>
+        <group>Type</group>
+        <text>Throw-in</text>
+      </label>
+    </instance>
+    <instance>
+      <ID>6</ID>
+      <start>28.00</start>
+      <end>30.00</end>
+      <code>PROGRESSION</code>
+      <label>
+        <group>Team</group>
+        <text>N/A</text>
+      </label>
+      <label>
+        <group>Half</group>
+        <text>1st Half</text>
+      </label>
+    </instance>
+    <instance>
+      <ID>7</ID>
+      <start>44.00</start>
+      <end>55.60</end>
+      <code>DEFENSIVE TRANSITION</code>
+      <label>
+        <group>Team</group>
+        <text>Alpha</text>
+      </label>
+      <label>
+        <group>Half</group>
+        <text>2nd Half</text>
+      </label>
+    </instance>
+    <instance>
+      <ID>8</ID>
+      <start>56.40</start>
+      <end>64.00</end>
+      <code>ATTACKING TRANSITION</code>
+      <label>
+        <group>Team</group>
+        <text>Alpha</text>
+      </label>
+      <label>
+        <group>Half</group>
+        <text>2nd Half</text>
+      </label>
+    </instance>
+    <instance>
+      <ID>9</ID>
+      <start>60.00</start>
+      <end>62.00</end>
+      <code>BALL IN THE BOX</code>
+      <label>
+        <group>Team</group>
+        <text>Alpha</text>
+      </label>
+      <label>
+        <group>Half</group>
+        <text>2nd Half</text>
+      </label>
+    </instance>
+  </ALL_INSTANCES>
+</file>

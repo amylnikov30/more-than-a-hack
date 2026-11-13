@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<main>
+  <Metadata>
+    <GlobalConfig>
+      <FileName>synthetic_poss_fixture</FileName>
+      <FrameRate>25</FrameRate>
+      <FieldSize><Width>105</Width><Height>68</Height></FieldSize>
+    </GlobalConfig>
+    <Teams>
+      <Team id="T1"><Name>Alpha FC</Name><ProviderTeamsParameters><ProviderParameter><Name>attack_direction_first_half</Name><Value>left_to_right</Value></ProviderParameter></ProviderTeamsParameters></Team>
+      <Team id="T2"><Name>Beta Club</Name><ProviderTeamsParameters><ProviderParameter><Name>attack_direction_first_half</Name><Value>right_to_left</Value></ProviderParameter></ProviderTeamsParameters></Team>
+    </Teams>
+    <Players>
+      <Player id="P1" teamId="T1"><Name>Track 1</Name><ShirtNumber>1</ShirtNumber></Player>
+      <Player id="P2" teamId="T1"><Name>Track 2</Name><ShirtNumber>2</ShirtNumber></Player>
+      <Player id="P3" teamId="T1"><Name>Track 3</Name><ShirtNumber>3</ShirtNumber></Player>
+      <Player id="P4" teamId="T1"><Name>Track 4</Name><ShirtNumber>4</ShirtNumber></Player>
+      <Player id="P5" teamId="T1"><Name>Track 5</Name><ShirtNumber>5</ShirtNumber></Player>
+      <Player id="P6" teamId="T2"><Name>Track 6</Name><ShirtNumber>6</ShirtNumber></Player>
+      <Player id="P7" teamId="T2"><Name>Track 7</Name><ShirtNumber>7</ShirtNumber></Player>
+      <Player id="P8" teamId="T2"><Name>Track 8</Name><ShirtNumber>8</ShirtNumber></Player>
+      <Player id="P9" teamId="T2"><Name>Track 9</Name><ShirtNumber>9</ShirtNumber></Player>
+      <Player id="P10" teamId="T2"><Name>Track 10</Name><ShirtNumber>10</ShirtNumber></Player>
+      <Player id="P11" teamId="REF"><Name>Track 11</Name><ShirtNumber>11</ShirtNumber></Player>
+    </Players>
+    <PlayerChannels>
+      <PlayerChannel id="player1_x" playerId="P1" channelId="x"/>
+      <PlayerChannel id="player1_y" playerId="P1" channelId="y"/>
+      <PlayerChannel id="player2_x" playerId="P2" channelId="x"/>
+      <PlayerChannel id="player2_y" playerId="P2" channelId="y"/>
+      <PlayerChannel id="player3_x" playerId="P3" channelId="x"/>
+      <PlayerChannel id="player3_y" playerId="P3" channelId="y"/>
+      <PlayerChannel id="player4_x" playerId="P4" channelId="x"/>
+      <PlayerChannel id="player4_y" playerId="P4" channelId="y"/>
+      <PlayerChannel id="player5_x" playerId="P5" channelId="x"/>
+      <PlayerChannel id="player5_y" playerId="P5" channelId="y"/>
+      <PlayerChannel id="player6_x" playerId="P6" channelId="x"/>
+      <PlayerChannel id="player6_y" playerId="P6" channelId="y"/>
+      <PlayerChannel id="player7_x" playerId="P7" channelId="x"/>
+      <PlayerChannel id="player7_y" playerId="P7" channelId="y"/>
+      <PlayerChannel id="player8_x" playerId="P8" channelId="x"/>
+      <PlayerChannel id="player8_y" playerId="P8" channelId="y"/>
+      <PlayerChannel id="player9_x" playerId="P9" channelId="x"/>
+      <PlayerChannel id="player9_y" playerId="P9" channelId="y"/>
+      <PlayerChannel id="player10_x" playerId="P10" channelId="x"/>
+      <PlayerChannel id="player10_y" playerId="P10" channelId="y"/>
+      <PlayerChannel id="player11_x" playerId="P11" channelId="x"/>
+      <PlayerChannel id="player11_y" playerId="P11" channelId="y"/>
+    </PlayerChannels>
+  </Metadata>
+  <DataFormatSpecifications>
+    <DataFormatSpecification endFrame="2000" separator=":" startFrame="1">
+      <StringRegister name="frameCount"/>
+      <SplitRegister separator=";">
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player1_x"/>
+          <PlayerChannelRef playerChannelId="player1_y"/>
+        </SplitRegister>
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player2_x"/>
+          <PlayerChannelRef playerChannelId="player2_y"/>
+        </SplitRegister>
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player3_x"/>
+          <PlayerChannelRef playerChannelId="player3_y"/>
+        </SplitRegister>
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player4_x"/>
+          <PlayerChannelRef playerChannelId="player4_y"/>
+        </SplitRegister>
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player5_x"/>
+          <PlayerChannelRef playerChannelId="player5_y"/>
+        </SplitRegister>
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player6_x"/>
+          <PlayerChannelRef playerChannelId="player6_y"/>
+        </SplitRegister>
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player7_x"/>
+          <PlayerChannelRef playerChannelId="player7_y"/>
+        </SplitRegister>
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player8_x"/>
+          <PlayerChannelRef playerChannelId="player8_y"/>
+        </SplitRegister>
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player9_x"/>
+          <PlayerChannelRef playerChannelId="player9_y"/>
+        </SplitRegister>
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player10_x"/>
+          <PlayerChannelRef playerChannelId="player10_y"/>
+        </SplitRegister>
+        <SplitRegister separator=",">
+          <PlayerChannelRef playerChannelId="player11_x"/>
+          <PlayerChannelRef playerChannelId="player11_y"/>
+        </SplitRegister>
+      </SplitRegister>
+      <SplitRegister separator=",">
+        <BallChannelRef channelId="x"/>
+        <BallChannelRef channelId="y"/>
+      </SplitRegister>
+    </DataFormatSpecification>
+  </DataFormatSpecifications>
+</main>

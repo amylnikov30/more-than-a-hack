@@ -266,3 +266,144 @@ clusters and their centres, no homography.
   split supports one threshold; a third group would need its own clause.
 - `n_tracked` is constant (22) on Sample Game 3, so it says nothing there; on the match it may
   drop during stoppages.
+
+## Possession signals (live play)
+
+These scripts ask, for each candidate signal for the live-play possession model, whether it is
+available often enough, separates the two teams, and is sharp enough in time. They do not build
+the model. Each `poss_*.py` script writes one `*_summary.csv` in the long format above (floats
+to 3 significant figures, NaN empty). Match runs and reference-game runs produce the same rows:
+rows that do not apply hold NaN.
+
+### Shared preparation (`poss_common.py`, `poss_reference.py`)
+
+`poss_common.py` is a separate module rather than an extension of `common.py`, which serves the
+dead-ball scripts; it reuses `ball_gaps`, `common` and `tag_gaps`.
+
+- **Tracking.** One streamed pass over the raw ATD into metres (`--pitch`); video frame =
+  `frame_id - 1`; slot teams per data-format spec from the metadata (first `<Team>` = home,
+  anything else = -1, e.g. referees).
+- **Attacking direction.** From the metadata's `attack_direction_first_half` team parameter
+  (Sample Game 3 declares it), flipped each half. Without it, inferred per half from the first
+  60 s of live frames: the team with the lower mean x attacks +x. Both are computed and their
+  agreement is reported (`params, direction, centroid_agreement`).
+- **Live mask.** Graded frames minus dead frames. On the match the dead frames come from the
+  dead-ball model (`src/deadball`), read from the `dead_ball.csv` that
+  `python -m deadball.run OUT_DIR` writes (`--dead`; `dead == 0` is live, -1 and missing rows
+  are not). On the reference game they come from its events (below).
+- **Ball interpolation.** Live gaps of at most `--max-interp-frames` (12 = 0.48 s) with an
+  observed neighbour on both sides inside the same live run are filled linearly. A gap next to a
+  dead frame or a half edge is never filled. Flag per frame: observed / interpolated / missing.
+- **Pseudo-labels (match).** `PHASE_TO_POSSESSION` maps each Smart Tagging code to "the tagged
+  team has the ball" (BUILD UP, PROGRESSION, ATTACKING TRANSITION, CREATING CHANCES, BALL IN
+  FINAL THIRD, LONG BALL), "the tagged team defends" (DEFENDING IN DEFENSIVE / MIDDLE /
+  ATTACKING THIRD, DEFENSIVE TRANSITION) or "ignore" (BALL IN THE BOX, PLAYERS IN THE BOX, SET
+  PIECES, GOALS). Codes match case-insensitively; `N/A` teams are dropped; frames where two
+  mapped tags disagree are dropped. Tag team names are matched to the metadata team names by a
+  shared word (`--tag-teams HOME,AWAY` overrides). Every script reports `agreement` per code:
+  over the frames where the code and at least one other code label, the share where all others
+  agree. **Uncertain mappings**, to check in the agreement rows first: LONG BALL (the ball may
+  end with the other team), ATTACKING / DEFENSIVE TRANSITION (they straddle the turnover that
+  starts them, so their first seconds may belong to the other team).
+- **Changes.** The first frame of the other team after a labelled frame of one team in the same
+  live run. A restart after a dead ball is not a change.
+
+**Reference labels (`poss_reference.py`, Metrica Sample Game 3).** Open data from
+github.com/metrica-sports/sample-data: `Sample_Game_3_tracking.txt` / `_metadata.xml` (EPTS,
+the same format as our ATD, x,y only, no speed) and `Sample_Game_3_events.json` (Metrica JSON:
+`type`, `subtypes`, `team.id`, `start.frame` / `end.frame` = tracking `frame_id`, `period`).
+Derived by code, never by hand:
+
+- *Dead* is the union of three rules (end exclusive). (1) Restarts: a `SET PIECE`, or any event
+  with subtype `GOAL KICK` (goal kicks are `PASS`, or `BALL LOST` when they fail, not
+  `SET PIECE`). The half's first restart is preceded by dead frames from the half's start; each
+  later one by dead frames from the end of the last event that starts strictly before it
+  (`CARD` skipped; the keeper's same-frame `RECOVERY` before a goal kick does not count). (2) After
+  `BALL OUT`, or a `SHOT` with subtype `OUT`, dead until the next event that starts later, even
+  if it is not a restart (one goal kick in Sample Game 3 is coded `BALL LOST / FORCED`). (3)
+  After an `END HALF` event, dead to the end of the half.
+- *Possession* on a live frame: the team of the most recent controlled event (`PASS`, `CARRY`,
+  `RECOVERY`, `SHOT`, `SET PIECE`). `BALL LOST`, `BALL OUT`, `CHALLENGE` (won or lost),
+  `FAULT RECEIVED` and `CARD` never change it, following CHALLENGE.md: a touch, a deflection or
+  an aerial duel without control is not a change.
+- *Check against the tracking.* In Metrica's open data the ball is blank while it is dead. On
+  Sample Game 3 the derived dead frames have the ball blank on 95.5% of frames, the live frames
+  on 0.4%. Rules (1) alone (before goal kicks and `END HALF` were handled) left 13 live gaps of
+  5 s or more, all stoppages; with the three rules none remain.
+- *Result on Sample Game 3:* 95,623 live and 48,138 dead frames (33.5%), 382 possessions (median
+  5.1 s, mean 10.0 s), 280 live turnovers, 104 dead runs (median 13.1 s). The public ground
+  truth has a mean possession of 14.2 s over 5 minutes, so event-derived possessions are
+  somewhat finer: every `RECOVERY` changes the team, including some the ground truth might call
+  loose balls.
+
+**Degraded copy (`--degrade`).** Sample Game 3 is corrected tracking: the ball is almost always
+present in live play and every player is one track. `--degrade` makes it look like our ATD,
+seeded by `--seed`: (a) ball dropped in bursts at uniform live start frames, clipped to live
+frames, until `--missing-share` (0.41) of live frames are missing. Burst lengths are log-normal,
+`--gap-lengths 1,1.1,30` (median 1 s, sigma 1.1, cap 30 s): about a quarter of bursts are under
+0.5 s and a tenth over 4 s. This is a guess, not fitted: compare the degraded run's gap bins
+with the match run of `poss_ball_live.py` and adjust if they differ. (b) Every player's
+presence runs are cut into pieces of exponential length (`--frag-mean-s 20`), losing
+`--frag-gap-frames` (5) frames at each cut, and each piece is re-slotted into a random free slot
+of 46. **Caveats.** 0.41 is the missing share on all *graded* frames of the match; on its live
+frames it is probably lower (in the public window 44% of missing frames are live), so the
+default is pessimistic. And the bursts land uniformly, while the real tracker loses the ball
+more where play is contested: on clean Sample Game 3 the ball is missing on 1.3% of frames
+within 2 s of a turnover against 0.1% elsewhere, and the degraded copy does not reproduce that
+(0.42 vs 0.41).
+
+### Ball availability on live play (`poss_ball_live.py`)
+
+**Question.** How much of live play has a ball at all, how long are the gaps, and does the ball
+go missing where possession changes? This sets how much the ball-free signals must carry.
+
+**Definitions.** On live frames: the share observed, interpolated and missing. A gap is a run
+of missing ball inside one live run (a gap that runs into a dead stretch is cut there). Gaps per
+half-open bin `[0,0.5) [0.5,2) [2,5) [5,inf)` s, before and after interpolation (count, frames,
+share of missing live frames); gap-length p10/p50/p90 before interpolation; frames filled at
+the main cap and at `--interp-also` (6, 25 frames); the missing share on dead frames; the
+missing share within `--change-window-s` (2 s) of a change (true labels on the reference game,
+pseudo-label changes on the match) against the rest of live play.
+
+**Defaults and why.** `--max-interp-frames 12` (0.48 s): a ball lost for under half a second
+has rarely changed direction more than once, so a straight line is a fair guess; 6 and 25 show
+how much depends on it. `--change-window-s 2`: a turnover is a short event; a wider window
+would dilute it with mid-possession play. Both are football norms, not tuned.
+
+**CSV schema** (`poss_ball_live_summary.csv`).
+
+| analysis | scope | bin | metric | unit |
+|---|---|---|---|---|
+| params | all / degrade / labels / live / direction / half h | | fps, pitch_*, lag, max_interp_frames, degrade, change_window, interp_also; seed, missing_share, gap_*, frag_*, bursts (degrade); source (labels: events / smart_tagging / none; live: events / dead_csv; direction: metadata / centroids / none), centroid_agreement; first/last_frame | |
+| labels | all / H / A | | live_frames, labelled_frames, frames, n_changes, dropped_frames | frames, count |
+| agreement | `code:<CODE>` (every mapped code) | | n_frames, agree_share | frames, share |
+| coverage | all / half h | `` / observed / interpolated / missing / missing_before_interp | live_frames, frames, share | frames, share of live frames |
+| gaps_before / gaps_after | all | `<0.5s` `0.5-2s` `2-5s` `>=5s` `all` | n_gaps, frames, share | count, frames, share of missing live frames |
+| gap_length | all | p10 / p50 / p90 | length | s |
+| interp_cap | all | cap in frames | filled_frames, share | frames, share of missing live frames |
+| dead | all | | dead_frames, missing_share | frames, share of dead frames |
+| change | all / around / rest | `` / before / after | n_changes, frames, missing_share | count, frames, share of live frames |
+
+**Tests.** `tests/test_poss_common.py` (live mask from events and from the dead CSV, reference
+labels and restart rules, slot teams, directions with and without the metadata, tag team map,
+pseudo-labels and agreement, interpolation, the degraded copy) and
+`tests/test_poss_ball_live.py` (coverage, bins, quantiles, caps, dead share, changes with true
+and pseudo-labels, identical rows for both label sources, no labels, `--degrade`) on
+`fixture_poss_*`.
+
+**Results on Sample Game 3.** Clean: 99.6% of live frames have the ball, so the open game says
+nothing about ball loss on its own; that is what `--degrade` is for. Degraded (41% missing):
+after interpolation 39.7% of live frames still have no ball, and almost all of it (99.9% of
+missing frames) is in gaps of 0.5 s or more, half of it in gaps of 5 s or more: interpolation
+cannot carry possession through those.
+
+**Questions for interpretation.**
+- What share of live frames is missing on the match, and how much does interpolation recover?
+  That share is the part of live play the ball-free signals (shape, reversal) must label alone.
+- Are most missing frames in gaps of 5 s or more? Long gaps mean a model must hold or change a
+  label for seconds without a ball: duration priors and ball-free signals matter most.
+- Is the missing share within 2 s of a pseudo-label change well above the rest? Then the ball
+  vanishes exactly at turnovers, and change timing must come from players, not the ball.
+- How far is the dead-frame missing share above the live one? The gap tells how much "ball
+  missing" says about dead ball once the dead-ball model has run (the dead-ball rule keeps it at
+  zero evidence).

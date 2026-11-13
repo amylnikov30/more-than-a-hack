@@ -1,0 +1,653 @@
+{
+ "data": [
+  {
+   "index": 1,
+   "team": {
+    "name": "Alpha FC",
+    "id": "T1"
+   },
+   "type": {
+    "name": "SET PIECE",
+    "id": 0
+   },
+   "subtypes": {
+    "name": "KICK OFF",
+    "id": 0
+   },
+   "start": {
+    "frame": 51,
+    "time": 2.04,
+    "x": null,
+    "y": null
+   },
+   "end": {
+    "frame": 51,
+    "time": 2.04,
+    "x": null,
+    "y": null
+   },
+   "period": 1,
+   "from": null,
+   "to": null
+  },
+  {
+   "index": 2,
+   "team": {
+    "name": "Alpha FC",
+    "id": "T1"
+   },
+   "type": {
+    "name": "PASS",
+    "id": 0
+   },
+   "subtypes": null,
+   "start": {
+    "frame": 90,
+    "time": 3.6,
+    "x": null,
+    "y": null
+   },
+   "end": {
+    "frame": 101,
+    "time": 4.04,
+    "x": null,
+    "y": null
+   },
+   "period": 1,
+   "from": null,
+   "to": null
+  },
+  {
+   "index": 3,
+   "team": {
+    "name": "Alpha FC",
+    "id": "T1"
+   },
+   "type": {
+    "name": "CARRY",
+    "id": 0
+   },
+   "subtypes": null,
+   "start": {
+    "frame": 101,
+    "time": 4.04,
+    "x": null,
+    "y": null
+   },
+   "end": {
+    "frame": 175,
+    "time": 7.0,
+    "x": null,
+    "y": null
+   },
+   "period": 1,
+   "from": null,
+   "to": null
+  },
+  {
+   "index": 4,
+   "team": {
+    "name": "Alpha FC",
+    "id": "T1"
+   },
+   "type": {
+    "name": "PASS",
+    "id": 0
+   },
+   "subtypes": null,
+   "start": {
+    "frame": 176,
+    "time": 7.04,
+    "x": null,
+    "y": null
+   },
+   "end": {
+    "frame": 191,
+    "time": 7.64,
+    "x": null,
+    "y": null
+   },
+   "period": 1,
+   "from": null,
+   "to": null
+  },
+  {
+   "index": 5,
+   "team": {
+    "name": "Alpha FC",
+    "id": "T1"
+   },
+   "type": {
+    "name": "PASS",
+    "id": 0
+   },
+   "subtypes": null,
+   "start": {
+    "frame": 211,
+    "time": 8.44,
+    "x": null,
+    "y": null
+   },
+   "end": {
+    "frame": 226,
+    "time": 9.04,
+    "x": null,
+    "y": null
+   },
+   "period": 1,
+   "from": null,
+   "to": null
+  },
+  {
+   "index": 6,
+   "team": {
+    "name": "Alpha FC",
+    "id": "T1"
+   },
+   "type": {
+    "name": "PASS",
+    "id": 0
+   },
+   "subtypes": null,
+   "start": {
+    "frame": 241,
+    "time": 9.64,
+    "x": null,
+    "y": null
+   },
+   "end": {
+    "frame": 251,
+    "time": 10.04,
+    "x": null,
+    "y": null
+   },
+   "period": 1,
+   "from": null,
+   "to": null
+  },
+  {
+   "index": 7,
+   "team": {
+    "name": "Alpha FC",
+    "id": "T1"
+   },
+   "type": {
+    "name": "BALL LOST",
+    "id": 0
+   },
+   "subtypes": {
+    "name": "INTERCEPTION",
+    "id": 0
+   },
+   "start": {
+    "frame": 281,
+    "time": 11.24,
+    "x": null,
+    "y": null
+   },
+   "end": {
+    "frame": 301,
+    "time": 12.04,
+    "x": null,
+    "y": null
+   },
+   "period": 1,
+   "from": null,
+   "to": null
+  },
+  {
+   "index": 8,
+   "team": {
+    "name": "Beta Club",
+    "id": "T2"
+   },
+   "type": {
+    "name": "RECOVERY",
+    "id": 0
+   },
+   "subtypes": {
+    "name": "INTERCEPTION",
+    "id": 0
+   },
+   "start": {
+    "frame": 301,
+    "time": 12.04,
+    "x": null,
+    "y": null
+   },
+   "end": {
+    "frame": 301,
+    "time": 12.04,
+    "x": null,
+    "y": null
+   },
+   "period": 1,
+   "from": null,
+   "to": null
+  },
+  {
+   "index": 9,
+   "team": {
+    "name": "Beta Club",
+    "id": "T2"
+   },
+   "type": {
+    "name": "PASS",
+    "id": 0
+   },
+   "subtypes": null,
+   "start": {
+    "frame": 341,
+    "time": 13.64,
+    "x": null,
+    "y": null
+   },
+   "end": {
+    "frame": 356,
+    "time": 14.24,
+    "x": null,
+    "y": null
+   },
+   "period": 1,
+   "from": null,
+   "to": null
+  },
+  {
+   "index": 10,
+   "team": {
+    "name": "Beta Club",
+    "id": "T2"
+   },
+   "type": {
+    "name": "PASS",
+    "id": 0
+   },
+   "subtypes": null,
+   "start": {
+    "frame": 401,
+    "time": 16.04,
+    "x": null,
+    "y": null
+   },
+   "end": {
+    "frame": 451,
+    "time": 18.04,
+    "x": null,
+    "y": null
+   },
+   "period": 1,
+   "from": null,
+   "to": null
+  },
+  {
+   "index": 11,
+   "team": {
+    "name": "Beta Club",
+    "id": "T2"
+   },
+   "type": {
+    "name": "BALL OUT",
+    "id": 0
+   },
+   "subtypes": null,
+   "start": {
+    "frame": 481,
+    "time": 19.24,
+    "x": null,
+    "y": null
+   },
+   "end": {
+    "frame": 501,
+    "time": 20.04,
+    "x": null,
+    "y": null
+   },
+   "period": 1,
+   "from": null,
+   "to": null
+  },
+  {
+   "index": 12,
+   "team": {
+    "name": "Beta Club",
+    "id": "T2"
+   },
+   "type": {
+    "name": "CARD",
+    "id": 0
+   },
+   "subtypes": {
+    "name": "YELLOW",
+    "id": 0
+   },
+   "start": {
+    "frame": 521,
+    "time": 20.84,
+    "x": null,
+    "y": null
+   },
+   "end": {
+    "frame": 521,
+    "time": 20.84,
+    "x": null,
+    "y": null
+   },
+   "period": 1,
+   "from": null,
+   "to": null
+  },
+  {
+   "index": 13,
+   "team": {
+    "name": "Alpha FC",
+    "id": "T1"
+   },
+   "type": {
+    "name": "SET PIECE",
+    "id": 0
+   },
+   "subtypes": {
+    "name": "THROW IN",
+    "id": 0
+   },
+   "start": {
+    "frame": 551,
+    "time": 22.04,
+    "x": null,
+    "y": null
+   },
+   "end": {
+    "frame": 557,
+    "time": 22.28,
+    "x": null,
+    "y": null
+   },
+   "period": 1,
+   "from": null,
+   "to": null
+  },
+  {
+   "index": 14,
+   "team": {
+    "name": "Beta Club",
+    "id": "T2"
+   },
+   "type": {
+    "name": "CHALLENGE",
+    "id": 0
+   },
+   "subtypes": [
+    {
+     "name": "GROUND",
+     "id": 0
+    },
+    {
+     "name": "LOST",
+     "id": 0
+    }
+   ],
+   "start": {
+    "frame": 701,
+    "time": 28.04,
+    "x": null,
+    "y": null
+   },
+   "end": {
+    "frame": 701,
+    "time": 28.04,
+    "x": null,
+    "y": null
+   },
+   "period": 1,
+   "from": null,
+   "to": null
+  },
+  {
+   "index": 15,
+   "team": {
+    "name": "Alpha FC",
+    "id": "T1"
+   },
+   "type": {
+    "name": "CHALLENGE",
+    "id": 0
+   },
+   "subtypes": [
+    {
+     "name": "GROUND",
+     "id": 0
+    },
+    {
+     "name": "WON",
+     "id": 0
+    }
+   ],
+   "start": {
+    "frame": 701,
+    "time": 28.04,
+    "x": null,
+    "y": null
+   },
+   "end": {
+    "frame": 701,
+    "time": 28.04,
+    "x": null,
+    "y": null
+   },
+   "period": 1,
+   "from": null,
+   "to": null
+  },
+  {
+   "index": 16,
+   "team": {
+    "name": "Alpha FC",
+    "id": "T1"
+   },
+   "type": {
+    "name": "CARRY",
+    "id": 0
+   },
+   "subtypes": null,
+   "start": {
+    "frame": 711,
+    "time": 28.44,
+    "x": null,
+    "y": null
+   },
+   "end": {
+    "frame": 761,
+    "time": 30.44,
+    "x": null,
+    "y": null
+   },
+   "period": 1,
+   "from": null,
+   "to": null
+  },
+  {
+   "index": 17,
+   "team": {
+    "name": "Beta Club",
+    "id": "T2"
+   },
+   "type": {
+    "name": "SET PIECE",
+    "id": 0
+   },
+   "subtypes": {
+    "name": "KICK OFF",
+    "id": 0
+   },
+   "start": {
+    "frame": 1051,
+    "time": 42.04,
+    "x": null,
+    "y": null
+   },
+   "end": {
+    "frame": 1051,
+    "time": 42.04,
+    "x": null,
+    "y": null
+   },
+   "period": 2,
+   "from": null,
+   "to": null
+  },
+  {
+   "index": 18,
+   "team": {
+    "name": "Alpha FC",
+    "id": "T1"
+   },
+   "type": {
+    "name": "CHALLENGE",
+    "id": 0
+   },
+   "subtypes": [
+    {
+     "name": "AERIAL",
+     "id": 0
+    },
+    {
+     "name": "LOST",
+     "id": 0
+    }
+   ],
+   "start": {
+    "frame": 1201,
+    "time": 48.04,
+    "x": null,
+    "y": null
+   },
+   "end": {
+    "frame": 1201,
+    "time": 48.04,
+    "x": null,
+    "y": null
+   },
+   "period": 2,
+   "from": null,
+   "to": null
+  },
+  {
+   "index": 19,
+   "team": {
+    "name": "Beta Club",
+    "id": "T2"
+   },
+   "type": {
+    "name": "CHALLENGE",
+    "id": 0
+   },
+   "subtypes": [
+    {
+     "name": "AERIAL",
+     "id": 0
+    },
+    {
+     "name": "WON",
+     "id": 0
+    }
+   ],
+   "start": {
+    "frame": 1201,
+    "time": 48.04,
+    "x": null,
+    "y": null
+   },
+   "end": {
+    "frame": 1201,
+    "time": 48.04,
+    "x": null,
+    "y": null
+   },
+   "period": 2,
+   "from": null,
+   "to": null
+  },
+  {
+   "index": 20,
+   "team": {
+    "name": "Beta Club",
+    "id": "T2"
+   },
+   "type": {
+    "name": "BALL LOST",
+    "id": 0
+   },
+   "subtypes": null,
+   "start": {
+    "frame": 1381,
+    "time": 55.24,
+    "x": null,
+    "y": null
+   },
+   "end": {
+    "frame": 1401,
+    "time": 56.04,
+    "x": null,
+    "y": null
+   },
+   "period": 2,
+   "from": null,
+   "to": null
+  },
+  {
+   "index": 21,
+   "team": {
+    "name": "Alpha FC",
+    "id": "T1"
+   },
+   "type": {
+    "name": "RECOVERY",
+    "id": 0
+   },
+   "subtypes": null,
+   "start": {
+    "frame": 1401,
+    "time": 56.04,
+    "x": null,
+    "y": null
+   },
+   "end": {
+    "frame": 1401,
+    "time": 56.04,
+    "x": null,
+    "y": null
+   },
+   "period": 2,
+   "from": null,
+   "to": null
+  },
+  {
+   "index": 22,
+   "team": {
+    "name": "Alpha FC",
+    "id": "T1"
+   },
+   "type": {
+    "name": "CARRY",
+    "id": 0
+   },
+   "subtypes": null,
+   "start": {
+    "frame": 1426,
+    "time": 57.04,
+    "x": null,
+    "y": null
+   },
+   "end": {
+    "frame": 1501,
+    "time": 60.04,
+    "x": null,
+    "y": null
+   },
+   "period": 2,
+   "from": null,
+   "to": null
+  }
+ ],
+ "metadata": []
+}
