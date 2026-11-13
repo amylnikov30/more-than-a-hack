@@ -374,7 +374,7 @@ would dilute it with mid-possession play. Both are football norms, not tuned.
 
 | analysis | scope | bin | metric | unit |
 |---|---|---|---|---|
-| params | all / degrade / labels / live / direction / half h | | fps, pitch_*, lag, max_interp_frames, degrade, change_window, interp_also; seed, missing_share, gap_*, frag_*, bursts (degrade); source (labels: events / smart_tagging / none; live: events / dead_csv; direction: metadata / centroids / none), centroid_agreement; first/last_frame | |
+| params | all / degrade / labels / live / direction / half h | | fps, pitch_*, lag, max_interp_frames, degrade, windows, timing_window (every poss_* script), change_window, interp_also; seed, missing_share, gap_*, frag_*, bursts (degrade); source (labels: events / smart_tagging / none; live: events / dead_csv; direction: metadata / centroids / none), centroid_agreement; first/last_frame | |
 | labels | all / H / A | | live_frames, labelled_frames, frames, n_changes, dropped_frames | frames, count |
 | agreement | `code:<CODE>` (every mapped code) | | n_frames, agree_share | frames, share |
 | coverage | all / half h | `` / observed / interpolated / missing / missing_before_interp | live_frames, frames, share | frames, share of live frames |
@@ -407,3 +407,99 @@ cannot carry possession through those.
 - How far is the dead-frame missing share above the live one? The gap tells how much "ball
   missing" says about dead ball once the dead-ball model has run (the dead-ball rule keeps it at
   zero evidence).
+
+### Separation and timing, shared by the signal scripts
+
+Every signal script reports separation the same way, so the notebook's scale map needs no
+extra runs. The signal is a per-frame score toward "home has the ball", NaN where the signal is
+absent. For each window w in `--windows` (0.5, 1, 2, 5, 10 s) plus 0 (the frame itself), the
+score is averaged over the defined frames of the centred window `[f - h, f + h]` inside the
+live run (`h = round(w x fps / 2)`), and three numbers are written to `separation` rows with
+`bin` = w:
+
+- `auc`: AUC (Mann-Whitney, ties half) of the smoothed score for home vs away possession over
+  all labelled live frames, an absent score counted as 0. This mixes availability and
+  separation: a signal that is right but rare stays near 0.5.
+- `auc_defined`: the same over frames where the smoothed score is defined. This is separation
+  alone.
+- `coverage`: share of live frames where the smoothed score is defined.
+
+An AUC below 0.5 means the hypothesis is reversed (the scripts do not fold it). No null is
+needed: chance is 0.5 by construction. Labels are the true labels on the reference game and the
+pseudo-labels on the match, whose own agreement rows show how noisy they are.
+
+Signals that fire at changes report `timing` rows: each label change takes the nearest signal
+event of the same new team within `--timing-window-s` (5 s; ties go to the later event); the
+error is event minus change, in s (p25, p50, p75, median absolute). `matched_share` is the share
+of changes with an event; `event_precision` the share of events with a same-team change within
+the window.
+
+### Carries (`poss_carries.py`)
+
+**Question.** When the ball moves with one player, is that player's team in possession, and how
+much of live play does that cover? Feeds the per-frame "who has the ball" emission of the model.
+
+**Definitions.** The ball is the interpolated ball. Velocities are backward differences over
+`--lag` (5) frames, defined only inside one live run. A frame is a carry candidate for a player
+of either team (referees excluded) if the ball is within `--carry-dist-m` and the velocity
+difference is below `--carry-dv`; the carrier is the nearest candidate. A carry is a run of
+frames with one carrier slot, at least `--carry-min-s` long; its team is the slot's team.
+Score: +1 home carry, -1 away carry. Precision: labelled carry frames whose carry team is the
+label (all, home, away). Switches: the first frame of a carry whose team differs from the
+previous carry in the same live run; their timing against label changes. Fast ball: live frames
+with a ball speed above `--fast-ball-ms`; `near_rate` is the share with the ball within
+`--carry-dist-m` of any player (what distance alone would call a touch), `carry_rate` the share
+inside carries (what the velocity test lets through).
+
+**Defaults and why** (football norms, not tuned). `--carry-dist-m 1.5`: about a stride; a
+dribbled ball stays within it. `--carry-dv 2`: a dribbled ball moves at the player's speed give
+or take a touch; a pass passing by does not. `--carry-min-s 0.5`: the shortest controlled
+touch-and-go. `--fast-ball-ms 15`: a firm pass; the ball has no height, so a fast ball close to
+a player is the best available proxy for a lofted ball passing over them.
+
+**CSV schema** (`poss_carries_summary.csv`), after the shared `params`, `labels` and
+`agreement` rows (params add carry_dist, carry_dv, carry_min, fast_ball):
+
+| analysis | scope | bin | metric | unit |
+|---|---|---|---|---|
+| coverage | all | | live_frames, n_carries, carry_frames, share | frames, count, share of live frames |
+| durations | all | `0.5-1s` `1-2s` `2-5s` `5-10s` `>=10s` | n_carries | count |
+| durations | length | p10 / p50 / p90 | length | s |
+| precision | all / H / A | | labelled_frames, precision | frames, share of labelled carry frames |
+| separation | carry | window s (`0` = frame) | auc, auc_defined, coverage | AUC, share of live frames |
+| timing | carry_switch | `` / p25 / p50 / p75 | n_changes, matched, matched_share, n_events, event_precision, error, median_abs_error | count, share, s |
+| fast_ball | all | | fast_frames, near_rate, carry_rate | frames, share of fast frames |
+
+**Tests.** `tests/test_poss_carries.py` on `fixture_poss_*`: the 14 carries (one of them a touch
+by the defending team), durations, precision, frame-level AUC, switch timing with true and
+pseudo-labels, the fast-ball rate against a per-frame loop, `--degrade`, and the shared AUC,
+rolling-mean, velocity and matching helpers.
+
+**Results on Sample Game 3.**
+
+| | clean | degraded |
+|---|---|---|
+| carries, share of live frames | 851, 0.345 | 554, 0.188 |
+| length p10 / p50 / p90 (s) | 0.64 / 1.24 / 2.80 | 0.60 / 1.08 / 2.40 |
+| precision (carry team = label) | 0.989 | 0.993 |
+| AUC at 0 / 1 / 2 / 5 / 10 s | 0.779 / 0.880 / 0.924 / 0.940 / 0.930 | 0.668 / 0.758 / 0.816 / 0.877 / 0.892 |
+| `auc_defined` at 0 / 10 s | 0.989 / 0.935 | 0.993 / 0.919 |
+| changes matched by a switch within 5 s, median error | 106 of 280, 0.90 s | 62 of 280, 1.08 s |
+| switches near a change | 0.845 | 0.766 |
+| fast-ball frames near a player, in a carry | 0.164, 0.000 | 0.157, 0.000 |
+
+When a carry exists it names the right team almost always; the limit is coverage. Smoothing
+trades sharpness for coverage, and on the degraded copy the AUC keeps rising to 10 s. Fewer than
+half of the turnovers are followed by a carry of the new team within 5 s: many possessions start
+with a first-time pass, so carries alone cannot place most changes.
+
+**Questions for interpretation.**
+- Is precision on the match (against pseudo-labels) close to the reference game's? A much lower
+  value points to either noisy pseudo-labels (check `agreement`) or false carries by defenders
+  pressing the carrier; the per-team split tells which team suffers.
+- What carry coverage does the match reach? Fragmented tracks break carries (a slot change ends
+  one), so compare it with the degraded copy rather than the clean one.
+- At which window does `auc` peak? That window is the scale at which carries should enter the
+  model; `auc_defined` falling with the window shows how much of the gain is coverage.
+- Is `carry_rate` on fast balls 0 while `near_rate` is not? Then the velocity test removes the
+  balls passing near or over a player, as intended.

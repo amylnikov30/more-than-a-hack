@@ -362,6 +362,133 @@ def interpolate_ball(ball, live, blocks, max_frames=MAX_INTERP_FRAMES):
     return ball, flag
 
 
+# ---------------------------------------------------------------- signals and separation
+
+WINDOWS_S = (0.5, 1.0, 2.0, 5.0, 10.0)   # rolling-mean windows for every AUC; 0 = the frame
+
+
+def velocity(xy, rid, lag, fps=FPS):
+    """Backward-difference velocity in m/s, (xy[f] - xy[f - lag]) * fps / lag, for (n, 2) or
+    (n, k, 2) positions; NaN unless f and f - lag are in the same live run (rid >= 0) and both
+    positions are present."""
+    xy = np.asarray(xy, dtype=float)
+    out = np.full(xy.shape, np.nan)
+    if lag <= 0 or len(xy) <= lag:
+        return out
+    same = (rid[lag:] >= 0) & (rid[lag:] == rid[:-lag])
+    d = (xy[lag:] - xy[:-lag]) * (fps / float(lag))
+    shape = (-1,) + (1,) * (xy.ndim - 1)
+    out[lag:] = np.where(same.reshape(shape), d, np.nan)
+    return out
+
+
+def rolling_mean(values, live, blocks, half_width):
+    """Centred mean of `values` over the defined (finite) frames of [f - h, f + h] inside f's
+    live run; NaN where none is defined or off live frames. half_width 0 returns the values on
+    live frames."""
+    values = np.asarray(values, dtype=float)
+    out = np.full(len(values), np.nan)
+    for r in live_runs(live, blocks):
+        seg = values[r["start"]:r["end"] + 1]
+        ok = np.isfinite(seg)
+        cs = np.concatenate([[0.0], np.cumsum(np.where(ok, seg, 0.0))])
+        cc = np.concatenate([[0], np.cumsum(ok)])
+        i = np.arange(len(seg))
+        lo = np.maximum(i - half_width, 0)
+        hi = np.minimum(i + half_width, len(seg) - 1) + 1
+        count = cc[hi] - cc[lo]
+        with np.errstate(invalid="ignore", divide="ignore"):
+            out[r["start"]:r["end"] + 1] = np.where(count > 0, (cs[hi] - cs[lo]) / count,
+                                                    np.nan)
+    return out
+
+
+def rankdata(x):
+    """Ranks 1..n with ties given their average rank."""
+    x = np.asarray(x, dtype=float)
+    order = np.argsort(x, kind="mergesort")
+    xs = x[order]
+    edges = np.concatenate([[True], xs[1:] != xs[:-1], [True]])
+    starts = np.flatnonzero(edges)
+    ranks = np.empty(len(x))
+    for a, b in zip(starts[:-1], starts[1:]):
+        ranks[order[a:b]] = (a + b + 1) / 2.0
+    return ranks
+
+
+def auc(score, positive):
+    """P(score of a positive > score of a negative), ties counted half (Mann-Whitney); NaN if
+    either class is empty. Frames with a NaN score must be removed by the caller."""
+    score = np.asarray(score, dtype=float)
+    positive = np.asarray(positive, dtype=bool)
+    n1, n0 = int(positive.sum()), int((~positive).sum())
+    if not n1 or not n0:
+        return math.nan
+    r = rankdata(score)
+    return float((r[positive].sum() - n1 * (n1 + 1) / 2.0) / (n1 * n0))
+
+
+def window_separation(score, labels, live, blocks, windows_s, fps=FPS):
+    """{window_s: (auc, auc_defined, coverage)} for "home has the ball" over labelled live
+    frames. score: per frame, NaN where the signal is absent. auc treats absent as 0 (no
+    evidence), auc_defined uses only frames with a defined smoothed score, coverage is the
+    share of live frames with one. Window 0 is the frame itself."""
+    out = {}
+    lab = (labels != NONE) & live
+    n_live = int(live.sum())
+    for w in [0.0] + [float(v) for v in windows_s]:
+        s = rolling_mean(score, live, blocks, int(round(w * fps / 2.0)))
+        defined = np.isfinite(s) & live
+        pos = labels == H
+        a = auc(np.where(defined, s, 0.0)[lab], pos[lab])
+        m = lab & defined
+        out[w] = (a, auc(s[m], pos[m]), defined.sum() / float(n_live) if n_live else math.nan)
+    return out
+
+
+def window_rows(analysis, scope, sep):
+    rows = []
+    for w, (a, ad, cov) in sorted(sep.items()):
+        b = "{:g}".format(w)
+        rows += [(analysis, scope, b, "auc", a, "AUC"),
+                 (analysis, scope, b, "auc_defined", ad, "AUC"),
+                 (analysis, scope, b, "coverage", cov, "share of live frames")]
+    return rows
+
+
+def match_changes(changes, change_team, events, event_team, window_frames, fps=FPS):
+    """Timing of a signal that fires at changes. changes / events: sorted frames; *_team their
+    new team. Each change takes the nearest event of the same team within the window (events
+    may be shared). Returns (errors in s for matched changes, n_events_near, n_events), where
+    n_events_near counts events with a same-team change within the window."""
+    changes, events = np.asarray(changes), np.asarray(events)
+    change_team, event_team = np.asarray(change_team), np.asarray(event_team)
+    errors = []
+    for c, t in zip(changes, change_team):
+        cand = events[(event_team == t) & (np.abs(events - c) <= window_frames)]
+        if len(cand):
+            best = cand[np.argmin(np.abs(cand - c) + 1e-3 * (cand < c))]
+            errors.append((best - c) / float(fps))
+    near = sum(1 for e, t in zip(events, event_team)
+               if np.any((change_team == t) & (np.abs(changes - e) <= window_frames)))
+    return errors, near, len(events)
+
+
+def timing_rows(analysis, scope, errors, n_changes, near, n_events):
+    q = common.percentiles(errors, [25, 50, 75])
+    rows = [(analysis, scope, "", "n_changes", n_changes, "count"),
+            (analysis, scope, "", "matched", len(errors), "count"),
+            (analysis, scope, "", "matched_share", len(errors) / float(n_changes)
+             if n_changes else math.nan, "share of changes"),
+            (analysis, scope, "", "n_events", n_events, "count"),
+            (analysis, scope, "", "event_precision", near / float(n_events)
+             if n_events else math.nan, "share of events")]
+    rows += [(analysis, scope, b, "error", v, "s") for b, v in zip(("p25", "p50", "p75"), q)]
+    rows.append((analysis, scope, "", "median_abs_error",
+                 float(np.median(np.abs(errors))) if errors else math.nan, "s"))
+    return rows
+
+
 # ---------------------------------------------------------------- degraded copy
 
 def degrade_ball(ball, live, rng, missing_share=MISSING_SHARE, median_s=GAP_MEDIAN_S,
@@ -474,6 +601,12 @@ def add_args(p, csv_name, example):
                    help="--degrade: mean tracklet length, s (default 20)")
     p.add_argument("--frag-gap-frames", type=int, default=FRAG_GAP_FRAMES,
                    help="--degrade: frames lost at each track break (default 5)")
+    p.add_argument("--windows", type=_floats, default=list(WINDOWS_S),
+                   help="rolling-mean windows for the AUCs, s (default 0.5,1,2,5,10; the "
+                        "frame itself, 0, is always added)")
+    p.add_argument("--timing-window-s", type=float, default=5.0,
+                   help="a signal event within this many s of a change can match it "
+                        "(default 5; a norm, not tuned)")
     p.add_argument("--null-n", type=int, default=bg.NULL_N, help="shifts (default 1000; 0 = off)")
     p.add_argument("--null-seed", type=int, default=bg.NULL_SEED)
     p.add_argument("--null-min-shift", type=float, default=bg.NULL_MIN_SHIFT_S,
@@ -580,7 +713,10 @@ def params_rows(ctx, extra=()):
             ("params", "all", "", "pitch_width", ctx["pitch"][1], "m"),
             ("params", "all", "", "lag", a.lag, "frames"),
             ("params", "all", "", "max_interp_frames", a.max_interp_frames, "frames"),
-            ("params", "all", "", "degrade", int(bool(a.degrade)), "flag")]
+            ("params", "all", "", "degrade", int(bool(a.degrade)), "flag"),
+            ("params", "all", "", "windows", ",".join("{:g}".format(w) for w in a.windows),
+             "s"),
+            ("params", "all", "", "timing_window", a.timing_window_s, "s")]
     if a.degrade:
         rows += [("params", "degrade", "", "seed", a.seed, ""),
                  ("params", "degrade", "", "missing_share", a.missing_share, "share"),

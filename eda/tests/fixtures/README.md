@@ -698,8 +698,9 @@ B1 0 m -> `0-0.1`; B2 5 x 0.034 = 0.17 m -> `0.1-0.25`; B3 0.68 m -> `0.5-1`; B4
   home = away + 10 m. Referee at the midpoint of the two centroids, y = 60.
 - **Ball.** Held 0.5 m in +x of a player, or in flight on a straight line between two hold
   points (`POSS_BALL`). Planted: a 3 s home carry (slot 2, 100-174), a home pass chain
-  2 -> 3 -> 5 -> 4 (175-249), an intercepted pass 4 -> away 8 (280-299), a loose ball between
-  home 5 and away 7 (700-709) and between home 3 and away 10 (1200-1210).
+  2 -> 3 -> 5 -> 4 (175-244), an intercepted pass 4 -> away 8 (280-299), an away touch without
+  control (away 7 holds the ball 700-729 and passes it to home 5, 730-739; the events keep home
+  in possession), and a loose ball between home 3 and away 10 (1200-1210).
 
 | | frames (video, inclusive) |
 |---|---|
@@ -832,3 +833,71 @@ reaches at least `--missing-share` and exceeds it by less than one burst; the sa
 same arrays. Track fragmentation with `--frag-gap-frames 0` keeps, on every frame, the same
 multiset of (team, x, y) over present slots; with the default gap, every lost position is
 within `--frag-gap-frames` frames after a break.
+
+## Expected: `poss_carries.py`
+
+**Rules (decided before coding).** Ball = the interpolated ball (observed or interpolated
+frames). Velocities are backward differences over `--lag` (5) frames, `(p[f] - p[f-5]) x 25 / 5`,
+defined only if both frames are in the same live run with the position available. A frame is a
+carry candidate for a player of either team (not team -1) if the ball is within `--carry-dist-m`
+(1.5 m) of the player and `|v_ball - v_player| < --carry-dv` (2 m/s); the carrier is the nearest
+candidate. A carry is a maximal run of frames with the same carrier slot, kept if it lasts at
+least `--carry-min-s` (0.5 s = 13 frames, `ceil(0.5 x 25)`). The carry team is the slot's team.
+Frame score: +1 on home carry frames, -1 on away, NaN elsewhere. Window w: the centred mean of
+the score over the defined frames of `[f - h, f + h]` inside the live run,
+`h = round(w x fps / 2)`; window `0` is the frame itself. `auc`: AUC of the score (NaN as 0) for
+"home has the ball" over labelled live frames, ties counted half; `auc_defined`: the same over
+frames with a defined score; `coverage`: share of live frames with a defined score. Precision:
+labelled carry frames whose carry team is the label. Switches: the first frame of a carry whose
+team differs from the previous carry in the same live run. Timing: for each change, the nearest
+switch to the same team within `--timing-window-s` (5 s); error = switch - change (s). Switch
+precision: switches with a same-team change within 5 s. Fast ball: live frames with a ball
+speed above `--fast-ball-ms` (15 m/s); `near_rate` = share of them with the ball within
+1.5 m of a player (distance only), `carry_rate` = share inside carries.
+
+**Why these frames.** Every hold puts the ball 0.5 m in +x of the holder, so on hold frames the
+ball moves exactly with the holder (velocity difference 0). The first 5 frames of a hold are
+not candidates: the ball at f - 5 was still in a pass flight (at least 0.81 m per frame, so the
+velocity difference is at least 3 m/s), or missing, or before the live run. The nearest
+opponent to any hold point is 1.80 m away (away 7's hold vs home 4), the rest at least 2.69 m.
+Pass flights are at least 20 m/s. The 13-frame interpolated gap 1100-1112 is not filled, so it
+splits away 9's hold in two; the filled 250-261 lies on home 4's straight path.
+
+| carry | frames | length (s) | team | true label |
+|---|---|---|---|---|
+| C1 | 55-89 | 35 (1.40) | H (slot 4) | H |
+| C2 | 105-174 | 70 (2.80) | H (slot 2; 150-152 interpolated) | H |
+| C3 | 195-209 | 15 (0.60) | H (slot 3) | H |
+| - | 230-239 | 10: too short (home 5) | | |
+| C4 | 250-279 | 30 (1.20) | H (slot 4) | H |
+| C5 | 305-339 | 35 (1.40) | A (slot 8) | A |
+| C6 | 360-399 | 40 (1.60) | A (slot 9) | A |
+| C7 | 455-479 | 25 (1.00) | A (slot 10; 450-454 have no ball at f - 5) | A |
+| C8 | 561-699 | 139 (5.56) | H (slot 3) | H |
+| C9 | 705-729 | 25 (1.00) | A (slot 7, the touch without control) | **H** |
+| C10 | 745-999 | 255 (10.20) | H (slot 5) | H |
+| C11 | 1055-1099 | 45 (1.80) | A (slot 9) | A |
+| C12 | 1118-1199 | 82 (3.28) | A (slot 9) | A |
+| C13 | 1216-1299 | 84 (3.36) | A (slot 10) | A |
+| C14 | 1430-1989 | 560 (22.40) | H (slot 2) | H |
+
+14 carries, 1,440 frames: coverage 1440 / 1850 = 0.778 of live frames. Duration bins
+`0.5-1s` 1, `1-2s` 7, `2-5s` 3, `5-10s` 1, `>=10s` 2. Length quantiles (frames 15, 25, 25, 30,
+35, 35, 40, 45, 70, 82, 84, 139, 255, 560): p10 25 fr = 1.0 s, p50 42.5 fr = 1.7 s, p90 220.2 fr
+= 8.808 s.
+
+**Events labels.** Precision 1415 / 1440 = 0.983; home carries 1,104 frames, precision 1.0;
+away carries 336 frames, 311 correct, 0.926. Window 0: H frames 1,300 (score +1 on 1,104, -1 on
+25, 0 on 171), A frames 550 (-1 on 311, 0 on 239): `auc` = (1104 x 550 + 171 x 311 + 0.5 x (171
+x 239 + 25 x 311)) / (1300 x 550) = 684703 / 715000 = 0.958; `auc_defined` = (1104 + 12.5) /
+1129 = 0.989; `coverage` 0.778. Switches: 305 (A), 705 (A), 745 (H), 1430 (H). Changes 300 (to
+A) and 1400 (to H) match 305 and 1430: errors +0.2 s and +1.2 s, matched 2 of 2; p25 0.45, p50
+0.7, p75 0.95 s, median absolute 0.7 s. Switch precision 2 / 4 = 0.5.
+
+**Tags (pseudo-labels).** Labelled carry frames: C1 30 (60-89), C2 70, C3 15, C4 30, C5 10
+(310-319; 320-339 are dropped), C6 40, C7 25, C12 82, C13 84, C14 170 (1430-1599); C8-C11 have
+no label. 556 frames, all correct: precision 1.0 (home 315, away 241). Changes 310 (to A) and
+1410 (to H): errors -0.2 s and +0.8 s, p50 0.3 s; switch precision 0.5.
+
+**Fast ball.** No carry frame has a fast ball (the ball moves with a player at about 1 m/s):
+`carry_rate` 0. `near_rate` is checked against a per-frame loop in the test.

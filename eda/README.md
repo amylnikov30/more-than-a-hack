@@ -13,7 +13,7 @@ eda/
 ├── scripts/           ball_gaps.py, ball_outside.py, ball_stationary.py, check_channels.py,
 │                      common.py, gap_stoppage.py, sample_long_gaps.py, signal_profiles.py,
 │                      speed_units.py, tag_gaps.py; possession: poss_common.py,
-│                      poss_reference.py, poss_ball_live.py
+│                      poss_reference.py, poss_ball_live.py, poss_carries.py
 ├── notebooks/         the four eda_*.ipynb + plot_helpers.py
 ├── reports/           the eda_*.pdf and eda_*.docx renders
 ├── docs/analyses.md   definitions and reading notes per analysis
@@ -36,6 +36,7 @@ The scripts import each other as siblings (`import ball_gaps`), so keep them tog
 | `tag_gaps.py` | lines gaps up with every Smart Tagging code and set-piece `Type`: (A) P(ball missing) per 1 s bin around each tag's start and end, (B) per gap-length band, how often gaps overlap a code or end within 5 s of its start, (C) for "gap >= L", proxy precision / recall against SET PIECES starts and the share of frames covered; A and B against a circular-shift null; needs `ball_gaps.py` next to it | `tag_gaps_summary.csv` |
 | `poss_common.py` | shared preparation for the `poss_*.py` scripts (no output of its own): tracking in metres, slot teams, attacking direction, live mask (graded minus the dead frames of `dead_ball.csv`), ball interpolation, Smart Tagging pseudo-labels with agreement per code, the `--degrade` copy | |
 | `poss_reference.py` | reference labels from Metrica's open event data (Sample Game 3 only): dead frames and H / A per live frame, checked against the ball-blank frames of the open tracking; label counts, possessions, dead runs | `poss_reference_summary.csv` |
+| `poss_carries.py` | carries (ball within 1.5 m of one player, moving with them, for 0.5 s or more): durations, share of live time, precision of "carry team = possessing team", AUC per smoothing window, timing of carry-team switches against possession changes, carries on fast balls | `poss_carries_summary.csv` |
 | `poss_ball_live.py` | ball availability on live frames: observed / interpolated / missing shares, gaps per length bin before and after interpolation, gap-length quantiles, other interpolation caps, missing share on dead frames and within 2 s of possession changes | `poss_ball_live_summary.csv` |
 
 Needs Python 3.8+ and numpy. `games.py` comes via `PYTHONPATH` (the team repo root has a copy). Match
@@ -209,6 +210,12 @@ the change rows:
 
 ```bash
 cd ~/more-than-a-hack && PYTHONPATH="$PWD" python3 eda/scripts/poss_ball_live.py "$HOME/eda_out/poss_ball_live" --dead "$HOME/eda_out/dead_ball/dead_ball.csv"
+```
+
+Carries (`poss_carries.py`):
+
+```bash
+cd ~/more-than-a-hack && PYTHONPATH="$PWD" python3 eda/scripts/poss_carries.py "$HOME/eda_out/poss_carries" --dead "$HOME/eda_out/dead_ball/dead_ball.csv"
 ```
 
 The Sample Game 3 runs (clean and `--degrade`) go to `$HOME/eda_out/poss_*_sg3` and
@@ -386,6 +393,14 @@ cd ~/more-than-a-hack && SG3=/path/to/Sample_Game_3 && python3 eda/scripts/poss_
 cd ~/more-than-a-hack && SG3=/path/to/Sample_Game_3 && python3 eda/scripts/poss_ball_live.py "$HOME/eda_out/poss_ball_live_sg3_deg" --raw "$SG3/Sample_Game_3_tracking.txt" --meta "$SG3/Sample_Game_3_metadata.xml" --events "$SG3/Sample_Game_3_events.json" --frames 0-69660,69661-143760 --pitch 105 68 --degrade
 ```
 
+```bash
+cd ~/more-than-a-hack && SG3=/path/to/Sample_Game_3 && python3 eda/scripts/poss_carries.py "$HOME/eda_out/poss_carries_sg3" --raw "$SG3/Sample_Game_3_tracking.txt" --meta "$SG3/Sample_Game_3_metadata.xml" --events "$SG3/Sample_Game_3_events.json" --frames 0-69660,69661-143760 --pitch 105 68
+```
+
+```bash
+cd ~/more-than-a-hack && SG3=/path/to/Sample_Game_3 && python3 eda/scripts/poss_carries.py "$HOME/eda_out/poss_carries_sg3_deg" --raw "$SG3/Sample_Game_3_tracking.txt" --meta "$SG3/Sample_Game_3_metadata.xml" --events "$SG3/Sample_Game_3_events.json" --frames 0-69660,69661-143760 --pitch 105 68 --degrade
+```
+
 ## Options (all `poss_*.py` scripts)
 
 `--raw`, `--meta` (required with `--raw`), `--tags` (pseudo-labels; default the match's Smart
@@ -395,10 +410,13 @@ Tagging without `--raw`), `--events` (reference game only: true labels and dead 
 `--max-interp-frames` (default 12), `--tag-teams HOME,AWAY` (Smart Tagging team names, when the
 automatic match fails), `--degrade` with `--seed` (default 0), `--missing-share` (default 0.41),
 `--gap-lengths MEDIAN_S,SIGMA,CAP_S` (default `1,1.1,30`), `--frag-mean-s` (default 20),
-`--frag-gap-frames` (default 5), and `--null-n`, `--null-seed`, `--null-min-shift` (as above).
+`--frag-gap-frames` (default 5), `--windows` (AUC smoothing windows, comma-separated s, default
+`0.5,1,2,5,10`; the frame itself is always added), `--timing-window-s` (default 5), and
+`--null-n`, `--null-seed`, `--null-min-shift` (as above).
 
 `poss_ball_live.py` also takes `--interp-also` (comma-separated frames, default `6,25`) and
-`--change-window-s` (default 2).
+`--change-window-s` (default 2). `poss_carries.py` takes `--carry-dist-m` (default 1.5),
+`--carry-dv` (m/s, default 2), `--carry-min-s` (default 0.5) and `--fast-ball-ms` (default 15).
 
 ## Tests (laptop only)
 
