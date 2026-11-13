@@ -167,3 +167,36 @@ averaged over up to 12 s. The next gain is there: a player model with shorter wi
 edges, or a restart detector based on the ball's first fast movement after a slow spell.
 Kick-off formation (every player in their own half) is still to do and can be scored on the
 sample games.
+
+## Experiments that did not make it in (13 Nov)
+
+Four attempts to push the model further, each scored on held-out sample games with the
+spellF1 matching on ball-in-play spells. The shipped player model scores 0.633 there.
+
+| Attempt | Held-out sample games | On the match | Decision |
+|---|---|---|---|
+| 150 player features (more windows, standing, sprinting, flow, spread, acceleration), logistic | 0.656 | not run | not kept |
+| Same features, small neural network | 0.665 | — | not kept |
+| + positional restart cues (player on a touchline, near a corner) | 0.671 | dead at 42 of 58 tagged set-piece starts (shipped: 51) | not kept |
+| + learned edge refinement (short-window model moves each edge up to 4 s) | 0.688 | 46 of 58; public check finds 3 stoppages of 4 (shipped: 4) | not kept |
+
+The gain on the sample games is real but small (+0.055, most of it from one game), and it does
+not carry over to the automatic tracking of the match. A model fitted to clean, corrected
+tracking with 186 features is more fragile than one with 18. The simpler model stays.
+
+What the error analysis on the sample games shows: stoppages of 10 s or more are found 94% of
+the time; stoppages under 6 s only 30%. Those short ones are quick throw-ins and free kicks
+where the players never slow down, so no player-only model can see them. On the match the ball
+evidence covers them: the ball is called dead at the start of 23 of 26 tagged throw-ins.
+
+Two label-free checks added while doing this:
+
+- **Tagged restarts** (`run.tag_check`, printed on every run): the ball is called dead at the
+  start of 51 of 58 tagged set pieces, against a chance level of 0.51. Misses: 3 goal kicks,
+  3 throw-ins, 1 corner.
+- **Goals**: in all four goal-to-kick-off stretches the model stays dead through the whole
+  celebration; the only live spell inside each goal tag is the attack that led to the goal.
+
+On the dead share: 51% is above the 37–41% of the sample games, but those are different matches
+and leagues. Without the full ground truth there is no evidence it is wrong, and both checks
+above are consistent with it.

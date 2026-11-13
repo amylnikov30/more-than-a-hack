@@ -23,6 +23,7 @@ import argparse
 import json
 import os
 import sys
+import xml.etree.ElementTree as ET
 
 import numpy as np
 
@@ -173,6 +174,33 @@ def summarise(result):
         np.mean(dead[missing] == hmm.DEAD), np.mean(dead[graded & ~missing] == hmm.DEAD)))
 
 
+def tag_check(result, game=games.GAME):
+    """Label-free check: is the ball called dead at the start of each tagged set piece?
+
+    Smart Tagging is automatic and its timing is loose, so this is evidence, not a score. Read
+    it against the chance line: a model that calls more of the match dead hits more tags for free.
+    """
+    path = games.asset_paths(game)["smart_tagging"]
+    if not os.path.isfile(path):
+        print("no Smart Tagging file: tag check skipped")
+        return
+    dead, fps = result["dead"], games.GAMES[game]["fps"]
+    hits = {}
+    for instance in ET.parse(path).iter("instance"):
+        if (instance.findtext("code") or "").strip().lower() != "set pieces":
+            continue
+        frame = int(round(float(instance.findtext("start")) * fps))
+        if frame >= len(dead) or dead[frame] < 0:
+            continue
+        kind = next((label.findtext("text") for label in instance.findall("label")
+                     if label.findtext("group") == "Type"), "(no Type)")
+        hits.setdefault(kind, []).append(dead[frame] == hmm.DEAD)
+    total = [hit for kind in hits for hit in hits[kind]]
+    print("dead at the start of tagged set pieces: {}/{} (chance {:.2f}); {}".format(
+        int(np.sum(total)), len(total), np.mean(dead[dead >= 0] == hmm.DEAD),
+        ", ".join("{} {}/{}".format(kind, int(np.sum(h)), len(h)) for kind, h in sorted(hits.items()))))
+
+
 def check(result, gt_path):
     """Alive/dead agreement on the public window. A pipeline check: never choose settings on it."""
     with open(gt_path) as handle:
@@ -209,6 +237,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     result = label(sharpen=not args.no_sharpen)
     summarise(result)
+    tag_check(result)
     if args.check:
         check(result, args.check)
     print("wrote", write_csv(result, args.out_dir))
