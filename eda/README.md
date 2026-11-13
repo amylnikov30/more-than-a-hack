@@ -15,7 +15,7 @@ eda/
 │                      speed_units.py, tag_gaps.py; possession: poss_common.py,
 │                      poss_reference.py, poss_ball_live.py, poss_carries.py,
 │                      poss_pass_chains.py, poss_shape.py, poss_ball_field.py,
-│                      poss_reversal.py, poss_contested.py
+│                      poss_reversal.py, poss_contested.py, poss_restarts.py
 ├── notebooks/         the four eda_*.ipynb + plot_helpers.py
 ├── reports/           the eda_*.pdf and eda_*.docx renders
 ├── docs/analyses.md   definitions and reading notes per analysis
@@ -44,6 +44,7 @@ The scripts import each other as siblings (`import ball_gaps`), so keep them tog
 | `poss_ball_field.py` | three scores for "home has the ball": ball position (which half), ball direction (sign of its x velocity), both teams' centroids drifting the same way; AUC per window, and per team the share of frames it has the ball by the ball's third of the pitch | `poss_ball_field_summary.csv` |
 | `poss_reversal.py` | joint reversals (both teams' direction flips within 1 s): rate against a circular-shift null, timing against possession changes, change-detection and implied-state AUC per window, each team's velocity in 1 s bins over +-10 s around changes against shifted anchors | `poss_reversal_summary.csv` |
 | `poss_contested.py` | nearest team to the ball (the organisers' baseline signal) and its flips: AUC per window, flip rate and contested share around possession changes, around loose balls that changed nothing (reference game) and mid-possession, and whether flip density separates turnovers from either | `poss_contested_summary.csv` |
+| `poss_restarts.py` | the team restarting after each dead ball, by five rules (player beyond a touchline or nearest the ball; opposite of the last team near the ball; opposite of the last label; Smart Tagging set-piece team; first label after): accuracy per rule on the reference game, pairwise agreement matrix (no per-restart rows) | `poss_restarts_summary.csv` |
 | `poss_ball_live.py` | ball availability on live frames: observed / interpolated / missing shares, gaps per length bin before and after interpolation, gap-length quantiles, other interpolation caps, missing share on dead frames and within 2 s of possession changes | `poss_ball_live_summary.csv` |
 
 Needs Python 3.8+ and numpy. `games.py` comes via `PYTHONPATH` (the team repo root has a copy). Match
@@ -253,6 +254,12 @@ Contested ball (`poss_contested.py`):
 
 ```bash
 cd ~/more-than-a-hack && PYTHONPATH="$PWD" python3 eda/scripts/poss_contested.py "$HOME/eda_out/poss_contested" --dead "$HOME/eda_out/dead_ball/dead_ball.csv"
+```
+
+Restarts (`poss_restarts.py`):
+
+```bash
+cd ~/more-than-a-hack && PYTHONPATH="$PWD" python3 eda/scripts/poss_restarts.py "$HOME/eda_out/poss_restarts" --dead "$HOME/eda_out/dead_ball/dead_ball.csv"
 ```
 
 The Sample Game 3 runs (clean and `--degrade`) go to `$HOME/eda_out/poss_*_sg3` and
@@ -478,6 +485,14 @@ cd ~/more-than-a-hack && SG3=/path/to/Sample_Game_3 && python3 eda/scripts/poss_
 cd ~/more-than-a-hack && SG3=/path/to/Sample_Game_3 && python3 eda/scripts/poss_contested.py "$HOME/eda_out/poss_contested_sg3_deg" --raw "$SG3/Sample_Game_3_tracking.txt" --meta "$SG3/Sample_Game_3_metadata.xml" --events "$SG3/Sample_Game_3_events.json" --frames 0-69660,69661-143760 --pitch 105 68 --degrade
 ```
 
+```bash
+cd ~/more-than-a-hack && SG3=/path/to/Sample_Game_3 && python3 eda/scripts/poss_restarts.py "$HOME/eda_out/poss_restarts_sg3" --raw "$SG3/Sample_Game_3_tracking.txt" --meta "$SG3/Sample_Game_3_metadata.xml" --events "$SG3/Sample_Game_3_events.json" --frames 0-69660,69661-143760 --pitch 105 68
+```
+
+```bash
+cd ~/more-than-a-hack && SG3=/path/to/Sample_Game_3 && python3 eda/scripts/poss_restarts.py "$HOME/eda_out/poss_restarts_sg3_deg" --raw "$SG3/Sample_Game_3_tracking.txt" --meta "$SG3/Sample_Game_3_metadata.xml" --events "$SG3/Sample_Game_3_events.json" --frames 0-69660,69661-143760 --pitch 105 68 --degrade
+```
+
 ## Options (all `poss_*.py` scripts)
 
 `--raw`, `--meta` (required with `--raw`), `--tags` (pseudo-labels; default the match's Smart
@@ -501,7 +516,9 @@ default 3). `poss_ball_field.py` takes `--min-ms` (slowest ball or team speed th
 a direction, default 0.5). `poss_reversal.py` takes `--min-ms` (default 0.5),
 `--reversal-window-s` (default 1) and `--change-window-s` (default 1). `poss_contested.py`
 takes `--flip-window-s` (default 2), `--context-s` (default 1.5), `--loose-gap-s` (default 3)
-and `--mid-margin-s` (default 5).
+and `--mid-margin-s` (default 5). `poss_restarts.py` takes `--geom-look-s` (default 1),
+`--last-look-s` (default 3), `--tag-window-s` (default 5), `--look-after-s` (default 5) and
+`--touchline-m` (default 0.5).
 
 ## Tests (laptop only)
 

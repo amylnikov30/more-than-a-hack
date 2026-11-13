@@ -731,6 +731,8 @@ Club", so the map to the metadata names "Alpha FC" / "Beta Club" goes through sh
 | DEFENSIVE TRANSITION | 1100-1390 | Alpha | A |
 | ATTACKING TRANSITION | 1410-1600 | Alpha | H |
 | BALL IN THE BOX | 1500-1550 | Alpha | ignored |
+| SET PIECES (Kick Off (Start)) | 25-60 | Alpha | ignored (used by `poss_restarts.py`) |
+| SET PIECES (Kick Off (Start)) | 1040-1060 | Beta Club | ignored (used by `poss_restarts.py`) |
 
 ## Rules (decided before coding)
 
@@ -1113,3 +1115,41 @@ from a contest that changes nothing?).
 (no events) `loose_no_change` is empty (NaN rows) and the changes are 310 and 1410. Everything
 else (nearest team, flips, densities, context means, contested shares and the window-0 AUCs) is
 checked against an independent per-frame recomputation from the fixture text in the test.
+
+## Expected: `poss_restarts.py`
+
+**Rules (decided before coding).** A restart is the first live frame r after a run of dead
+graded frames, in the same half (a dead run that ends the half has none). Five predictions of
+the restarting team, each undefined when its evidence is missing:
+- `geometric`: on the frames r .. r + `--geom-look-s` (1 s), the first frame with a player of
+  either team more than `--touchline-m` (0.5 m) beyond a touchline (a throw-in taker: that
+  player's team) or, failing that, with a ball (interpolated): the nearest player's team.
+- `last_opposite`: the other team than the one nearest the ball on the last live frame with a
+  ball within `--last-look-s` (3 s) before the dead run (who touched it last).
+- `label_opposite`: the other team than the last labelled frame of the live run just before
+  the dead run (true labels on the reference game, pseudo-labels on the match).
+- `tag_team`: the team of the Smart Tagging `SET PIECES` tag with a mapped team (not `N/A`)
+  whose start is nearest to r within `--tag-window-s` (5 s).
+- `label_after`: the label of the first labelled frame within `--look-after-s` (5 s) from r
+  (on the reference game this is the true restart team; on the match the pseudo-label).
+Truth (reference game only): the true label at r. Per rule: defined restarts, accuracy against
+the truth. Agreement: for each pair of rules, restarts where both are defined and the share
+where they agree. No per-restart rows.
+
+**By hand.** Dead runs 0-49, 500-549, 1000-1049: restarts at 50, 550 and 1050; truth home,
+home, away. Nobody is beyond a touchline (y from 19 to 49 m; the referee at 60 m is no team).
+
+| rule | 50 | 550 | 1050 |
+|---|---|---|---|
+| geometric | home (ball with home 4) | home (ball missing to 555; at 556 with home 3) | away (away 9) |
+| last_opposite | - (half start) | home (last ball 479, with away 10) | - |
+| label_opposite | - | home (last label 499 away; tags: 489 away) | - |
+| tag_team | home (tag at 25, 1 s before) | - (only the `N/A` throw-in tag at 540) | away (tag at 1040) |
+| label_after (events) | home | home | away |
+| label_after (tags) | home (first label 60) | - (no label in 550-675) | away (first label 1100) |
+
+Accuracy with events: geometric 3 / 3, last_opposite 1 / 1, label_opposite 1 / 1, tag_team
+2 / 2, label_after 3 / 3 (all 1.0). Agreement with events: every pair with both defined agrees
+(1.0); geometric-last_opposite 1 restart, geometric-tag_team 2, geometric-label_after 3,
+last_opposite-tag_team 0 (NaN). With tags: accuracy NaN (no truth); geometric-label_after 2
+restarts, agreement 1.0.

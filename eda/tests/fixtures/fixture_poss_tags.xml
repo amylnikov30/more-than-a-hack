@@ -131,5 +131,41 @@
         <text>2nd Half</text>
       </label>
     </instance>
+    <instance>
+      <ID>10</ID>
+      <start>1.00</start>
+      <end>2.40</end>
+      <code>SET PIECES</code>
+      <label>
+        <group>Team</group>
+        <text>Alpha</text>
+      </label>
+      <label>
+        <group>Half</group>
+        <text>1st Half</text>
+      </label>
+      <label>
+        <group>Type</group>
+        <text>Kick Off (Start)</text>
+      </label>
+    </instance>
+    <instance>
+      <ID>11</ID>
+      <start>41.60</start>
+      <end>42.40</end>
+      <code>SET PIECES</code>
+      <label>
+        <group>Team</group>
+        <text>Beta Club</text>
+      </label>
+      <label>
+        <group>Half</group>
+        <text>2nd Half</text>
+      </label>
+      <label>
+        <group>Type</group>
+        <text>Kick Off (Start)</text>
+      </label>
+    </instance>
   </ALL_INSTANCES>
 </file>

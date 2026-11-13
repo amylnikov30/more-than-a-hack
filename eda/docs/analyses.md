@@ -843,3 +843,62 @@ signals above have to fix.
   are independent (ball vs no ball) and a model can combine them.
 - Flips per minute on the match against the reference game: many more means the ball track
   jumps between players and the nearest team needs heavier smoothing.
+
+### Restarts (`poss_restarts.py`)
+
+**Question.** After a dead ball, which team restarts? CHALLENGE.md says every restart has a
+clear possessor; getting it right starts each possession on the correct label. Feeds the
+model's entry state after every `D` stretch.
+
+**Definitions.** A restart is the first live frame after a dead run, in the same half. Five
+predictions, each undefined when its evidence is missing: `geometric` (in the first
+`--geom-look-s` from the restart, a player more than `--touchline-m` beyond a touchline, i.e. a
+throw-in taker, else the player nearest the ball), `last_opposite` (the other team than the one
+nearest the ball when it was last seen, within `--last-look-s` before the stoppage, in the same
+half), `label_opposite` (the other team than the last label in the live run before the
+stoppage; true labels on the reference game, pseudo-labels on the match), `tag_team` (the
+Smart Tagging `SET PIECES` team nearest the restart within `--tag-window-s`, when not `N/A`),
+`label_after` (the first label within `--look-after-s` of the restart; on the match the
+pseudo-label, on the reference game the truth itself). Truth (reference game only): the true
+label at the restart. Per rule: restarts where it is defined, accuracy. Pairwise agreement
+matrix over all rule pairs. No per-restart rows.
+
+**CSV schema** (`poss_restarts_summary.csv`), after the shared rows (params add geom_look,
+last_look, tag_window, look_after, touchline):
+
+| analysis | scope | bin | metric | unit |
+|---|---|---|---|---|
+| restarts | all / truth | | n, home_share | count, share |
+| rules | rule | | defined, defined_share, n_truth, accuracy | restarts, share |
+| agreement_matrix | `rule1\|rule2` | | n, agree_share | restarts, share |
+
+**Tests.** `tests/test_poss_restarts.py`: the three restarts, every rule's prediction by hand
+(including the throw-in after the away team put the ball out, a half start with no previous
+possession, and the tag rule skipping an `N/A` tag), accuracy, agreement, pseudo-labels, a
+player beyond the touchline. Writing the test found that the look-back crossed the half-time
+boundary; it now stays in the restart's half.
+
+**Results on Sample Game 3** (102 restarts; no Smart Tagging there).
+
+| rule | clean: defined, accuracy | degraded: defined, accuracy |
+|---|---|---|
+| geometric | 102, 1.000 | 100, 1.000 |
+| last_opposite | 100, 0.640 | 85, 0.588 |
+| label_opposite | 100, 0.810 | 100, 0.810 |
+
+The geometric rule is right every time here, but that is optimistic: in Metrica's open
+(corrected) data the ball reappears exactly at the taker's feet, and the derived restart frame
+is the restart event itself. On the automatic ATD the ball may reappear late or away from the
+taker, so trust the match's agreement matrix more than this number. "The other team than the
+last one in possession" is right 81% of the time (free kicks often go to the team that had the
+ball); "the other team than the one last near the ball" only 64%, because the last tracked
+touch is often not the last real one.
+
+**Questions for interpretation.**
+- On the match, how often do `geometric` and `tag_team` agree where both exist? High agreement
+  means either can set the restart team; disagreements point at throw-ins taken away from the
+  tracked ball or at tag timing.
+- Does `geometric` agree with `label_after` (the pseudo-label after the restart)? Low agreement
+  would question the pseudo-labels near restarts rather than the rule.
+- How many restarts have no `tag_team` (all throw-ins are `N/A`)? That share needs the
+  geometric rule (a player beyond the touchline).

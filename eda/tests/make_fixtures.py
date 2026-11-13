@@ -631,6 +631,8 @@ POSS_TAGS = [
     ("DEFENSIVE TRANSITION", 1100, 1390, "Alpha", None),
     ("ATTACKING TRANSITION", 1410, 1600, "Alpha", None),
     ("BALL IN THE BOX", 1500, 1550, "Alpha", None),
+    ("SET PIECES", 25, 60, "Alpha", "Kick Off (Start)"),
+    ("SET PIECES", 1040, 1060, "Beta Club", "Kick Off (Start)"),
 ]
 
 
