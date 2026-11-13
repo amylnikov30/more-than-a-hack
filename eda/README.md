@@ -14,7 +14,8 @@ eda/
 │                      common.py, gap_stoppage.py, sample_long_gaps.py, signal_profiles.py,
 │                      speed_units.py, tag_gaps.py; possession: poss_common.py,
 │                      poss_reference.py, poss_ball_live.py, poss_carries.py,
-│                      poss_pass_chains.py, poss_shape.py, poss_ball_field.py
+│                      poss_pass_chains.py, poss_shape.py, poss_ball_field.py,
+│                      poss_reversal.py
 ├── notebooks/         the four eda_*.ipynb + plot_helpers.py
 ├── reports/           the eda_*.pdf and eda_*.docx renders
 ├── docs/analyses.md   definitions and reading notes per analysis
@@ -41,6 +42,7 @@ The scripts import each other as siblings (`import ball_gaps`), so keep them tog
 | `poss_pass_chains.py` | passes (ball leaves one player and moves with a teammate, faster than 5 m/s in between) and chains of consecutive passes by one team: passes per team, chain lengths, live time covered, precision of "a chain of >= 2 passes by T => T has the ball" per chain length, AUC per window, timing of chain-team switches | `poss_pass_chains_summary.csv` |
 | `poss_shape.py` | team shape per frame (width, length, hull area, centroid advance and velocity, defensive-line depth, players goal-side of the ball): possessing minus defending, AUC per window split by ball present / missing, each team's line depth when defending and attacking | `poss_shape_summary.csv` |
 | `poss_ball_field.py` | three scores for "home has the ball": ball position (which half), ball direction (sign of its x velocity), both teams' centroids drifting the same way; AUC per window, and per team the share of frames it has the ball by the ball's third of the pitch | `poss_ball_field_summary.csv` |
+| `poss_reversal.py` | joint reversals (both teams' direction flips within 1 s): rate against a circular-shift null, timing against possession changes, change-detection and implied-state AUC per window, each team's velocity in 1 s bins over +-10 s around changes against shifted anchors | `poss_reversal_summary.csv` |
 | `poss_ball_live.py` | ball availability on live frames: observed / interpolated / missing shares, gaps per length bin before and after interpolation, gap-length quantiles, other interpolation caps, missing share on dead frames and within 2 s of possession changes | `poss_ball_live_summary.csv` |
 
 Needs Python 3.8+ and numpy. `games.py` comes via `PYTHONPATH` (the team repo root has a copy). Match
@@ -238,6 +240,12 @@ Ball position vs direction (`poss_ball_field.py`):
 
 ```bash
 cd ~/more-than-a-hack && PYTHONPATH="$PWD" python3 eda/scripts/poss_ball_field.py "$HOME/eda_out/poss_ball_field" --dead "$HOME/eda_out/dead_ball/dead_ball.csv"
+```
+
+Joint reversals (`poss_reversal.py`):
+
+```bash
+cd ~/more-than-a-hack && PYTHONPATH="$PWD" python3 eda/scripts/poss_reversal.py "$HOME/eda_out/poss_reversal" --dead "$HOME/eda_out/dead_ball/dead_ball.csv"
 ```
 
 The Sample Game 3 runs (clean and `--degrade`) go to `$HOME/eda_out/poss_*_sg3` and
@@ -447,6 +455,14 @@ cd ~/more-than-a-hack && SG3=/path/to/Sample_Game_3 && python3 eda/scripts/poss_
 cd ~/more-than-a-hack && SG3=/path/to/Sample_Game_3 && python3 eda/scripts/poss_ball_field.py "$HOME/eda_out/poss_ball_field_sg3_deg" --raw "$SG3/Sample_Game_3_tracking.txt" --meta "$SG3/Sample_Game_3_metadata.xml" --events "$SG3/Sample_Game_3_events.json" --frames 0-69660,69661-143760 --pitch 105 68 --degrade
 ```
 
+```bash
+cd ~/more-than-a-hack && SG3=/path/to/Sample_Game_3 && python3 eda/scripts/poss_reversal.py "$HOME/eda_out/poss_reversal_sg3" --raw "$SG3/Sample_Game_3_tracking.txt" --meta "$SG3/Sample_Game_3_metadata.xml" --events "$SG3/Sample_Game_3_events.json" --frames 0-69660,69661-143760 --pitch 105 68
+```
+
+```bash
+cd ~/more-than-a-hack && SG3=/path/to/Sample_Game_3 && python3 eda/scripts/poss_reversal.py "$HOME/eda_out/poss_reversal_sg3_deg" --raw "$SG3/Sample_Game_3_tracking.txt" --meta "$SG3/Sample_Game_3_metadata.xml" --events "$SG3/Sample_Game_3_events.json" --frames 0-69660,69661-143760 --pitch 105 68 --degrade
+```
+
 ## Options (all `poss_*.py` scripts)
 
 `--raw`, `--meta` (required with `--raw`), `--tags` (pseudo-labels; default the match's Smart
@@ -466,8 +482,9 @@ automatic match fails), `--degrade` with `--seed` (default 0), `--missing-share`
 `poss_pass_chains.py` takes `--carry-dist-m` and `--carry-dv` (the contact test),
 `--touch-min-s` (default 0.2), `--pass-min-ms` (default 5), `--pass-max-s` (default 5) and
 `--min-chain` (passes, default 2). `poss_shape.py` takes `--min-players` (outfield players,
-default 3). `poss_ball_field.py` takes `--min-ms` (slowest ball or centroid speed that counts as
-a direction, default 0.5).
+default 3). `poss_ball_field.py` takes `--min-ms` (slowest ball or team speed that counts as
+a direction, default 0.5). `poss_reversal.py` takes `--min-ms` (default 0.5),
+`--reversal-window-s` (default 1) and `--change-window-s` (default 1).
 
 ## Tests (laptop only)
 

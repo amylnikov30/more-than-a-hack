@@ -3,7 +3,7 @@
 Three scores toward "home has the ball", in home's attacking frame: (a) ball_position, the
 ball's x minus half the pitch (is the ball in the away half?); (b) ball_direction, the sign of the
 ball's x velocity (is it moving toward the away goal?); (c) team_drift, +1 / -1 when both teams'
-outfield centroids move toward the away / home goal (no ball needed). AUC of each at each
+outfield players move (median x velocity, as poss_shape.py) toward the away / home goal (no ball needed). AUC of each at each
 --windows rolling mean. If (a) underperforms (b) and (c), ball position is confounded (e.g. by
 high pressing, which keeps the ball in the pressed team's half while it has it). Also, per team,
 the share of ball-present frames it has the ball by the ball's third of the pitch in its attacking
@@ -54,7 +54,7 @@ def signals(ctx, min_ms=MIN_MS):
     with np.errstate(invalid="ignore"):
         out["ball_direction"] = np.where(np.abs(vx) >= min_ms, np.sign(vx), np.nan)
     feats, _ = ps.team_features(ctx, hull=False)
-    v = [pc.velocity(feats[t]["cx"][:, None], rid, a.lag, a.fps)[:, 0] * d_h for t in (0, 1)]
+    v = [feats[t]["vx_median"] * d_h for t in (0, 1)]
     with np.errstate(invalid="ignore"):
         up = (v[0] >= min_ms) & (v[1] >= min_ms)
         down = (v[0] <= -min_ms) & (v[1] <= -min_ms)

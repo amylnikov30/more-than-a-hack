@@ -953,8 +953,10 @@ of its run), change 300 matched with error +0.2 s, event precision 1 / 1.
 the deepest player (smallest attacking-frame x) is taken as the goalkeeper and dropped; the
 features use the rest ("outfield"), and need at least `--min-players` (3) of them, else NaN.
 `width` = y range; `length` = attacking-frame x range; `hull_area` = convex hull area (m^2);
-`centroid_advance` = mean attacking-frame x; `centroid_velocity` = its backward difference over
-`--lag` inside the live run (m/s); `line_depth` = attacking-frame x of the deepest outfield
+`centroid_advance` = mean attacking-frame x; `centroid_velocity` = the median, over outfield
+players, of each player's x velocity (backward difference over `--lag` of its own slot inside
+the live run), in the team's attacking frame (m/s; all players move together here, so it equals
+the centroid's velocity); `line_depth` = attacking-frame x of the deepest outfield
 player (metres from the own goal line); `goal_side` = share of outfield players with
 attacking-frame x below the ball's (interpolated ball), or below the opponent outfield
 centroid's when the ball is missing. Hypothesis: the possessing team has the larger value, except
@@ -1012,8 +1014,8 @@ frame (x toward the away goal), NaN where undefined:
   half).
 - `ball_direction`: the sign of the ball's x velocity (backward difference over `--lag` inside
   the live run), NaN when |vx| < `--min-ms` (0.5 m/s).
-- `team_drift`: +1 when both teams' outfield centroids (as in `poss_shape.py`) move toward the
-  away goal at `--min-ms` or more, -1 when both move toward the home goal at that speed, NaN
+- `team_drift`: +1 when both teams (median outfield player x velocity, as in `poss_shape.py`)
+  move toward the away goal at `--min-ms` or more, -1 when both move toward the home goal at that speed, NaN
   otherwise.
 Separation per window as for carries. `thirds`: for each team T, labelled live frames with the
 ball present, by the ball's third in T's attacking frame (`defensive` [0, 35), `middle`
@@ -1039,3 +1041,49 @@ ball 0.5 m in front of home 2 at x = cA + 4.5 with cA = 60): ball x in home's fr
 **Ball position, ball direction, thirds.** Continuous in the fixture, so the test recomputes
 them from the fixture text with a plain per-frame loop (its own parser, interpolation of the two
 short gaps 150-152 and 250-261, and a pairwise AUC count) and requires exact agreement.
+
+## Expected: `poss_reversal.py`
+
+**Rules (decided before coding).** Per team, the median outfield player x velocity (as in
+`poss_ball_field.py`) in home's attacking frame. Direction state per live run, with hysteresis:
++1 once the velocity is at least `--min-ms` (0.5 m/s), -1 once it is at most -0.5, unchanged
+in between; the first state in a run is not a flip. A flip is a frame where the state changes.
+A home flip is joint when an away flip to the same direction lies within
+`--reversal-window-s` (1 s = 25 frames); the joint reversal is at the later of the two (the
+nearest away flip), and its new direction names the implied new possessor (+1: home attacks, so
+home; -1: away). Rate: joint reversals per minute of live play. Null: away flips shifted
+circularly within their half by the `--null-*` offsets, joint reversals recounted; `p_emp` =
+(1 + shifts with at least the real count) / (1 + shifts). Timing against label changes as for
+carries. Change detection: indicator 1 on reversal frames, 0 on other live frames, smoothed per
+window; AUC for "a label change within `--change-window-s` (1 s) of the frame". State: after a
+joint reversal, the implied possessor holds until the next one in the live run (NaN before the
+first); separation per window as for carries. Profile: each team's centroid velocity in the
+attacking frame of the team gaining possession, pooled per 1 s bin over -10 s .. +10 s around
+the label changes (window clipped to the half; undefined frames, e.g. dead, not counted), with
+the changes shifted circularly within each half as the null.
+
+**By hand.** The centroid velocities (both teams equal) are those of the team-drift rule:
++1 on 55-301 (+0.6 at 301), +0.2 at 302, -0.2 at 303, -0.6 at 304, -1 on 305-499; +1 on
+555-999; -1 on 1055-1400, -0.6 at 1401, -0.2, +0.2, +0.6 at 1404, +1 on 1405-1999. Flips:
+home and away both at 304 (to -1) and 1404 (to +1). 2 joint reversals: 304 (away), 1404
+(home). Rate 2 / (1850 / 1500 min) = 1.62 per minute. With `--null-min-shift 5` every shift
+is 125-875 frames in a 1,000-frame half, so no shifted away flip lies within 25 frames of a home
+flip: null mean 0, `p_emp` 1 / (N + 1). With the default 60 s the halves are too short and the
+null is skipped.
+
+Timing (events: changes 300 to away, 1400 to home): errors +0.16 s and +0.16 s, 2 of 2
+matched, event precision 1.0. Tags (changes 310, 1410): -0.24 s and -0.24 s.
+
+Change detection (events; positives 275-325 and 1375-1425, 102 frames; negatives 1,748):
+window 0: (2 x 1748 + 0.5 x 100 x 1748) / (102 x 1748) = 52 / 102 = 0.510; window 1 s (25
+frames, h = 12): 50 frames at 1/25 (292-316 and 1392-1416), all positives: (50 + 0.5 x 52) /
+102 = 0.745.
+
+State (events): away on 304-499, home on 1404-1999, NaN elsewhere. Window 0: home frames
+596 at +1, 704 at 0; away frames 196 at -1, 354 at 0: `auc` = (596 x 550 + 704 x 196 + 0.5 x
+704 x 354) / 715000 = 590392 / 715000 = 0.826; `auc_defined` 1.0; coverage 792 / 1850 = 0.428.
+
+Profile (events, gainer's frame): before both changes -1; bin [0, 1 s) = (-1 - 0.6 - 0.2 +
+0.2 + 0.6 + 20 x 1) / 25 = 0.76 for each change; +1 after. Bins -10 .. -1: -1 (bin -10 counts
+20 + 25 = 45 frames: 50-54 have no velocity); bin 0: 0.76; bins 1 .. 9: +1 (bins 8 and 9 count
+only the 1400 change's 25 frames each: 500-549 are dead). The same for both teams.

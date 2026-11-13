@@ -2,7 +2,9 @@
 
 Per team and live frame, over its outfield players (the deepest player in the team's attacking
 frame is taken as the goalkeeper and dropped): width, length, convex-hull area, centroid advance
-toward the opponent goal and its velocity, defensive-line depth (deepest outfield player, metres
+toward the opponent goal, team velocity (median x velocity of the outfield players, each
+from its own track, so fragmented tracks do not jerk it as they jerk a centroid),
+defensive-line depth (deepest outfield player, metres
 from the own goal line), and the share of players goal-side of the ball (of the opponent
 centroid when the ball is missing). For each feature: possessing minus defending team, and the
 AUC of home-minus-away (signed by the hypothesis) for "home has the ball" at each --windows
@@ -26,6 +28,7 @@ eda/tests/fixtures/README.md. Aggregates only.
 import argparse
 import math
 import os
+import warnings
 
 import numpy as np
 
@@ -80,6 +83,9 @@ def team_features(ctx, min_players=MIN_PLAYERS, hull=True):
     rid = pc.run_id(live, ctx["blocks"], n)
     x = players[..., 0].astype(float)
     y = players[..., 1].astype(float)
+    # per-slot x velocity: a slot's own track only, so players entering or leaving the tracked
+    # set (fragmented tracks) do not move it the way they move a centroid
+    vx = pc.velocity(x[:, :, None], rid, ctx["args"].lag, ctx["args"].fps)[:, :, 0]
     out = {}
     for t in (0, 1):
         d = direction_by_frame(ctx["dirs"], ctx["half_of"], t)
@@ -102,8 +108,13 @@ def team_features(ctx, min_players=MIN_PLAYERS, hull=True):
             sel = m[i]
             area[i] = hull_area(x[i, sel].tolist(), y[i, sel].tolist())
         f["hull_area"] = area
-        f["centroid_velocity"] = pc.velocity(f["centroid_advance"][:, None], rid, ctx["args"].lag,
-                                             ctx["args"].fps)[:, 0]
+        mv = np.where(m & np.isfinite(vx), vx, np.nan)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)
+            vmed = np.nanmedian(mv, axis=1)
+        vmed = np.where(ok, vmed, np.nan)
+        f["vx_median"] = vmed                                   # absolute x, m/s
+        f["centroid_velocity"] = vmed * np.where(d != 0, d, np.nan)   # own attacking frame
         f.update({"xg": xg, "mask": m, "dir": d, "ok": ok})
         out[t] = f
     ball = ctx["ball_interp"]

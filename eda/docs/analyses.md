@@ -578,8 +578,9 @@ emission model, the part that must carry the 40% of live play without a ball.
 **Definitions.** Per team and live frame, in the team's attacking frame (x toward the opponent
 goal), over its present players minus the deepest one (taken as the goalkeeper; "outfield"),
 with at least `--min-players` (3) of them: `width` (y range), `length` (x range), `hull_area`
-(convex hull, m^2), `centroid_advance` (mean x), `centroid_velocity` (its change over `--lag`
-inside the live run), `line_depth` (x of the deepest outfield player = metres from the own goal
+(convex hull, m^2), `centroid_advance` (mean x), `centroid_velocity` (median of the outfield
+players' own x velocities over `--lag` inside the live run; a centroid's velocity jumps whenever
+a fragmented track enters or leaves, a per-player median does not), `line_depth` (x of the deepest outfield player = metres from the own goal
 line), `goal_side` (share of outfield players behind the ball, or behind the opponent outfield
 centroid when the ball is missing). Hypothesis: the possessing team has the larger value, except
 `goal_side` (smaller); the score toward "home has the ball" is that sign times home minus away
@@ -612,7 +613,7 @@ the degraded copy at that window):
 | hull_area | +524 m^2 | 0.920 / 0.922 (5 s) | 0.918 / 0.922 | 0.919 |
 | length | +4.6 m | 0.838 / 0.847 (10 s) | 0.835 / 0.847 | 0.844 |
 | goal_side | -0.4 | 0.815 / 0.850 (10 s) | 0.790 / 0.858 | 0.845 |
-| centroid_velocity | +0.6 m/s | 0.642 / 0.647 (5 s) | 0.599 / 0.647 | 0.653 |
+| centroid_velocity | +0.7 m/s | 0.649 / 0.655 (10 s) | 0.649 / 0.655 | 0.670 |
 | centroid_advance | +8.3 m | 0.606 / 0.620 (10 s) | 0.606 / 0.621 | 0.606 |
 | line_depth | +1.5 m | 0.505 / 0.523 (10 s) | 0.506 / 0.524 | 0.509 |
 
@@ -630,7 +631,10 @@ defending, so there is no low block there.
 - Is `centroid_advance` weak (as on Sample Game 3) because both teams move together? Then
   position on the pitch says little about possession, and `poss_ball_field.py` should confirm it.
 - Does `centroid_velocity` peak at a short window? It is a change signal (see
-  `poss_reversal.py`), not a holding signal.
+  `poss_reversal.py`), not a holding signal. (It was first the centroid's own velocity; on the
+  degraded copy that gave ten times the direction flips of the clean game, because every track
+  entering or leaving the set moves the centroid. The per-player median is as stable degraded as
+  clean.)
 
 ### Ball position vs ball direction vs team drift (`poss_ball_field.py`)
 
@@ -642,8 +646,8 @@ half while the other has it). Feeds the choice of position vs direction features
 **Definitions.** Scores toward "home has the ball", in home's attacking frame:
 `ball_position` = interpolated ball x minus half the pitch length (positive = away half);
 `ball_direction` = sign of the ball's x velocity over `--lag`, NaN below `--min-ms`;
-`team_drift` = +1 / -1 when both teams' outfield centroids (as in `poss_shape.py`) move toward
-the away / home goal at `--min-ms` or more, NaN otherwise (no ball needed). Separation per
+`team_drift` = +1 / -1 when both teams (median outfield player x velocity, as in
+`poss_shape.py`) move toward the away / home goal at `--min-ms` or more, NaN otherwise (no ball needed). Separation per
 window as in "Separation and timing". `thirds`: per team, labelled ball-present live frames by
 the ball's third of the pitch in that team's attacking frame (`defensive` [0, 35), `middle`,
 `attacking` [70, 105] m), and the share where that team has the ball.
@@ -671,7 +675,7 @@ themselves and smoothed means are rounded to 1e-9.
 |---|---|---|---|---|
 | ball_position | 0.997 | 0.386 / 0.396 | 0.603 | 0.426 / 0.409 |
 | ball_direction | 0.880 | 0.647 / 0.703 | 0.510 | 0.610 / 0.657 |
-| team_drift | 0.637 | 0.618 / 0.597 | 0.551 | 0.604 / 0.607 |
+| team_drift | 0.612 | 0.624 / 0.615 | 0.610 | 0.624 / 0.615 |
 
 Share of ball-present frames on which a team has the ball, by the ball's third in its attacking
 frame (clean): home 0.672 / 0.513 / 0.394 and away 0.606 / 0.487 / 0.328 (defensive / middle /
@@ -679,7 +683,7 @@ attacking). On Sample Game 3 ball position is *reversed*: a team has the ball mo
 the ball is in its own third (build-up from the back, the keeper, the other team's attack ending
 in a clearance) than in the opponent's. As a score it carries some information (0.61 if flipped),
 but in the opposite direction from the naive reading and only weakly. Ball direction and team
-drift are both weak (0.60-0.70) and need long windows; neither reaches the 0.75 bar. Team drift
+drift are both weak (0.61-0.70); neither reaches the 0.75 bar. Team drift
 is a change signal more than a holding signal: see `poss_reversal.py`.
 
 **Questions for interpretation.**
@@ -689,3 +693,83 @@ is a change signal more than a holding signal: see `poss_reversal.py`.
   (or position only together with the team that has just touched it).
 - Team drift with a low AUC and a coverage near 0.6 says both teams moving together happens
   often but does not by itself say who has the ball.
+
+### Joint reversals (`poss_reversal.py`)
+
+**Question.** At a turnover both teams turn around: the new possessor starts attacking, the old
+one retreats. Can that joint reversal place a change of possession without the ball, and how
+sharply? Feeds the change detector (the transition part of the model), which is where spellF1
+is won or lost.
+
+**Definitions.** Team velocity: the median x velocity of the outfield players (as in
+`poss_shape.py`), in home's attacking frame. Direction state per live run with hysteresis: +1
+once the velocity reaches `--min-ms`, -1 once it reaches -`--min-ms`, unchanged in between; a
+flip is a change of state (the first state of a run is not one). A joint reversal is a home flip
+with an away flip to the same direction within `--reversal-window-s`, placed at the later of
+the two; its direction names the implied new possessor (both teams now moving toward the away
+goal: home). Reported:
+
+- *rate*: flips per team and joint reversals per live minute; joint count against the away
+  flips shifted circularly within each half (`--null-*`): null mean, p5, p95, `p_emp`, lift;
+- *timing*: changes matched by a reversal to the same team (as in "Separation and timing");
+- *change detection*: AUC of the reversal indicator, smoothed per window, for "a label change
+  within `--change-window-s`" (a different target from the other scripts' AUCs: change vs no
+  change, not home vs away; `separation, reversal_change`);
+- *state*: the possessor implied by the last reversal, held to the next one in the live run;
+  separation per window (`separation, reversal_state`);
+- *profile*: each team's velocity in the gaining team's attacking frame, pooled per 1 s bin
+  over +-10 s around label changes, against the changes shifted circularly within each half
+  (random live anchors). `gainer` is the team gaining possession, `loser` the other.
+
+**Defaults and why** (norms, not tuned). `--min-ms 0.5`: a drifting team, not a standing one.
+`--reversal-window-s 1`: two teams react to the same turnover within about a second.
+`--change-window-s 1`: the change-detection target.
+
+**CSV schema** (`poss_reversal_summary.csv`), after the shared rows (params add min_ms,
+reversal_window, change_window, profile_window, profile_bin, null n / seed / min_shift):
+
+| analysis | scope | bin | metric | unit |
+|---|---|---|---|---|
+| flips | H / A | | n, per_min | count, per live minute |
+| reversals | all / null | | n, per_min, joint_share_of_home_flips; null_mean, null_p5, null_p95, p_emp, lift | |
+| timing | reversal | `` / p25 / p50 / p75 | as for carries | |
+| separation | reversal_change | `` / window s | n_positive, auc | frames, AUC (change vs no change) |
+| separation | reversal_state | window s | auc, auc_defined, coverage | AUC, share |
+| profile | anchors | | n_H, n_A | count |
+| profile | gainer / loser | bin left edge, s | value, counted, null_mean, null_p5, null_p95 | m/s in the gainer's frame, frames |
+
+**Tests.** `tests/test_poss_reversal.py`: the two planted reversals, rate, null (and that it is
+skipped when a half is too short), timing with true and pseudo-labels, change-detection AUC,
+state AUC, the profile per bin, hysteresis and pairing on small cases, `--degrade`.
+
+**Results on Sample Game 3** (clean / degraded).
+
+| | clean | degraded |
+|---|---|---|
+| flips per minute, home / away | 5.5 / 5.4 | 5.7 / 5.5 |
+| joint reversals per minute; vs null mean | 3.7; 234 vs 21 | 3.8; 240 vs 22 |
+| changes matched within 5 s; median error | 111 of 280; +2.0 s | 113 of 280; +1.8 s |
+| reversals within 5 s of a same-team change | 0.44 | 0.44 |
+| change-detection AUC at 0 / 2 / 10 s | 0.500 / 0.512 / 0.560 | 0.500 / 0.514 / 0.559 |
+| implied-state AUC at 0 / 10 s (coverage) | 0.547 / 0.562 (0.69) | 0.569 / 0.586 (0.70) |
+
+The gaining team's velocity around a change (clean, m/s in its attacking frame): -0.56 at
+-3 s, -0.83 at -2 s, -1.02 at -1 s, -0.78 in the first second after, -0.20 in the second, +0.26
+in the third. Teams do reverse together far more than chance (11 times the null), and the
+turnaround is visible in the averaged profile, but it comes late: the gaining team keeps
+retreating for about 1.5 s after the change, so a reversal lands about 2 s after the turnover.
+Fewer than half of the turnovers produce one, and more than half of the reversals happen with no
+turnover (teams also turn when a pass goes backwards). On its own it is neither sharp nor
+reliable enough to place changes; it may still help as soft evidence that a change happened in
+the last few seconds, combined with ball signals. The degraded copy gives the same numbers, so
+the signal survives fragmented tracks once velocities come from players rather than the
+centroid.
+
+**Questions for interpretation.**
+- Is the joint count on the match also far above its null? If not, the match's tracking breaks
+  the signal and it should be dropped.
+- Where does the gainer profile cross zero on the match? That lag is how far a reversal-based
+  change would land after the real one; with spellF1 about 0.65 for a possession placed 1 s
+  late (EVALUATION.md), a 2 s lag is costly unless corrected by a constant shift.
+- Is the change-detection AUC near 0.5 at short windows (as on Sample Game 3)? Then reversals
+  only help at the scale of several seconds.
