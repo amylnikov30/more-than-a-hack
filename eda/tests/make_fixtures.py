@@ -22,6 +22,9 @@ Files written
                                declared-ball, speed-band and displacement rows
     fixture_speed_atd.*        12 frames, 3 slots + ball, declared speed in km/h, for
                                speed_units.py
+    fixture_poss_*             2,000 frames, 5 + 5 players and a referee, x,y only, with an
+                               events JSON (true labels), a Smart Tagging XML (pseudo-labels)
+                               and a dead_ball.csv, for the poss_*.py scripts
 
 The design (gaps, tags, crowding) is in the constants below; the hand-derived answers it implies
 are in tests/fixtures/README.md and asserted in tests/test_ball_gaps.py.
@@ -244,10 +247,10 @@ def metadata_xml():
            player_channels="\n".join(player_channels), refs="\n".join(refs))
 
 
-def smart_tagging_xml(tags=None):
+def smart_tagging_xml(tags=None, half_split=1550):
     instances = []
     for i, (code, start, end, team, kind) in enumerate(TAGS if tags is None else tags, 1):
-        half = "1st Half" if start * FPS < 1550 else "2nd Half"
+        half = "1st Half" if start * FPS < half_split else "2nd Half"
         labels = [("Team", team), ("Half", half)] + ([("Type", kind)] if kind else [])
         instances.append(
             "    <instance>\n      <ID>{}</ID>\n      <start>{:.2f}</start>\n"
@@ -552,8 +555,276 @@ def disp_frame_line(f):
     return "{}:{}:{}".format(f + 1, player, ball)
 
 
+# ---------------------------------------------------------------- possession fixture (poss_*.py)
+# 2,000 frames, two halves of 1,000, 5 + 5 players and a referee, ball schedule with planted
+# carries, a pass chain, a turnover with a joint reversal, ball gaps and a throw-in taken by the
+# team that did not touch the ball last. Pitch 105 x 68 m, x,y only (like Sample Game 3). The
+# true labels come from an events JSON in the open Metrica format, the pseudo-labels from a
+# Smart Tagging XML, the dead frames also from a dead_ball.csv. See fixtures/README.md.
+
+POSS_N = 2000
+POSS_PITCH = (105.0, 68.0)
+POSS_GRADED = [(1, 0, 999), (2, 1000, 1999)]             # --frames 0-999,1000-1999
+POSS_HOME = (1, 2, 3, 4, 5)                               # slot 1 / 6 are the goalkeepers
+POSS_AWAY = (6, 7, 8, 9, 10)
+POSS_REF = 11
+POSS_DX = (-6.0, -6.0, 6.0, 6.0)                          # outfield offsets from the centroid, m
+POSS_DY = (-15.0, 15.0, -8.0, 8.0)                        # times the width scale
+POSS_WIDE, POSS_NARROW, POSS_RAMP = 1.0, 0.6, 25          # possessing / defending width scale
+# Formation possessor per frame (dead frames take the adjacent one); the width ramps over
+# POSS_RAMP frames after 300, 550 and 1400.
+POSS_FORM = [(0, 299, "H"), (300, 549, "A"), (550, 999, "H"), (1000, 1399, "A"),
+             (1400, 1999, "H")]
+POSS_RAMPS = (300, 550, 1400)
+# Ball missing, inclusive video frames (dead stretches: 0-49, 500-549, 1000-1049).
+POSS_BALL_NAN = [(0, 29), (150, 152), (250, 261), (400, 449), (480, 555), (1000, 1039),
+                 (1100, 1112), (1300, 1424), (1990, 1999)]
+# Ball schedule, inclusive video frames: ("hold", slot) = 0.5 m in +x of the slot;
+# ("pass", a, b) = straight line from the hold point of a on first - 1 to that of b on
+# last + 1; ("loose", a, b) = between two players, 30% of the way from a to b on even
+# frame pairs and 70% on odd ones (f // 2 even / odd), so the nearest team flips.
+POSS_BALL = [
+    (0, 89, ("hold", 4)), (90, 99, ("pass", 4, 2)), (100, 174, ("hold", 2)),
+    (175, 189, ("pass", 2, 3)), (190, 209, ("hold", 3)), (210, 224, ("pass", 3, 5)),
+    (225, 239, ("hold", 5)), (240, 244, ("pass", 5, 4)), (245, 279, ("hold", 4)),
+    (280, 299, ("pass", 4, 8)), (300, 339, ("hold", 8)), (340, 354, ("pass", 8, 9)),
+    (355, 399, ("hold", 9)), (400, 449, ("pass", 9, 10)), (450, 555, ("hold", 10)),
+    (556, 699, ("hold", 3)), (700, 729, ("hold", 7)), (730, 739, ("pass", 7, 5)),
+    (740, 999, ("hold", 5)),
+    (1000, 1199, ("hold", 9)), (1200, 1210, ("loose", 3, 10)), (1211, 1299, ("hold", 10)),
+    (1300, 1999, ("hold", 2)),
+]
+# Events (type, subtypes, team, start, end) in video frames; the JSON stores frame_id = + 1.
+POSS_EVENTS = [
+    (1, "SET PIECE", ["KICK OFF"], "T1", 50, 50),
+    (1, "PASS", None, "T1", 89, 100),
+    (1, "CARRY", None, "T1", 100, 174),
+    (1, "PASS", None, "T1", 175, 190),
+    (1, "PASS", None, "T1", 210, 225),
+    (1, "PASS", None, "T1", 240, 250),
+    (1, "BALL LOST", ["INTERCEPTION"], "T1", 280, 300),
+    (1, "RECOVERY", ["INTERCEPTION"], "T2", 300, 300),
+    (1, "PASS", None, "T2", 340, 355),
+    (1, "PASS", None, "T2", 400, 450),
+    (1, "BALL OUT", None, "T2", 480, 500),
+    (1, "CARD", ["YELLOW"], "T2", 520, 520),
+    (1, "SET PIECE", ["THROW IN"], "T1", 550, 556),
+    (1, "CHALLENGE", ["GROUND", "LOST"], "T2", 700, 700),
+    (1, "CHALLENGE", ["GROUND", "WON"], "T1", 700, 700),
+    (1, "CARRY", None, "T1", 710, 760),
+    (2, "SET PIECE", ["KICK OFF"], "T2", 1050, 1050),
+    (2, "CHALLENGE", ["AERIAL", "LOST"], "T1", 1200, 1200),
+    (2, "CHALLENGE", ["AERIAL", "WON"], "T2", 1200, 1200),
+    (2, "BALL LOST", None, "T2", 1380, 1400),
+    (2, "RECOVERY", None, "T1", 1400, 1400),
+    (2, "CARRY", None, "T1", 1425, 1500),
+]
+POSS_DEAD = [(0, 49), (500, 549), (1000, 1049)]
+# Smart Tagging: (code, start_frame, end_frame, team, type), end exclusive.
+POSS_TAGS = [
+    ("build up", 60, 290, "Alpha", None),
+    ("DEFENDING IN MIDDLE THIRD", 60, 290, "Beta Club", None),
+    ("PROGRESSION", 310, 490, "Beta Club", None),
+    ("Long Ball", 320, 360, "Alpha", None),
+    ("SET PIECES", 540, 560, "N/A", "Throw-in"),
+    ("PROGRESSION", 700, 750, "N/A", None),
+    ("DEFENSIVE TRANSITION", 1100, 1390, "Alpha", None),
+    ("ATTACKING TRANSITION", 1410, 1600, "Alpha", None),
+    ("BALL IN THE BOX", 1500, 1550, "Alpha", None),
+    ("SET PIECES", 25, 60, "Alpha", "Kick Off (Start)"),
+    ("SET PIECES", 1040, 1060, "Beta Club", "Kick Off (Start)"),
+]
+
+
+def _poss_form(f):
+    for a, b, team in POSS_FORM:
+        if a <= f <= b:
+            return team
+    raise ValueError(f)
+
+
+def _poss_scale(f, team):
+    """Width scale of `team` ('H'/'A') on frame f."""
+    target = POSS_WIDE if _poss_form(f) == team else POSS_NARROW
+    for r in POSS_RAMPS:
+        if r <= f < r + POSS_RAMP:
+            start = POSS_NARROW if target == POSS_WIDE else POSS_WIDE
+            return start + (target - start) * (f - r) / float(POSS_RAMP)
+    return target
+
+
+def poss_centroids(f):
+    """(home outfield centroid x, away outfield centroid x) in metres."""
+    if f < 1000:
+        if f < 50:
+            c = 40.0
+        elif f <= 300:
+            c = 40.0 + 0.04 * (f - 50)
+        elif f < 500:
+            c = 50.0 - 0.04 * (f - 300)
+        elif f < 550:
+            c = 42.0
+        else:
+            c = 42.0 + 0.04 * (f - 550)
+        return c, c + 10.0
+    if f < 1050:
+        a = 50.0
+    elif f <= 1400:
+        a = 50.0 + 0.04 * (f - 1050)
+    else:
+        a = 64.0 - 0.04 * (f - 1400)
+    return a + 10.0, a
+
+
+def poss_player(f, slot):
+    """(x, y) in metres of a slot on frame f."""
+    half1 = f < 1000
+    if slot == 1:
+        return (5.0 if half1 else 100.0), 34.0
+    if slot == 6:
+        return (100.0 if half1 else 5.0), 34.0
+    ch, ca = poss_centroids(f)
+    if slot == POSS_REF:
+        return (ch + ca) / 2.0, 60.0
+    if slot in POSS_HOME:
+        k, c, s = slot - 2, ch, _poss_scale(f, "H")
+    else:
+        k, c, s = slot - 7, ca, _poss_scale(f, "A")
+    return c + POSS_DX[k], 34.0 + POSS_DY[k] * s
+
+
+def _poss_hold(f, slot):
+    x, y = poss_player(f, slot)
+    return x + 0.5, y
+
+
+def poss_ball(f):
+    """(x, y) in metres from the schedule (also on frames where the ball is written as NaN)."""
+    for a, b, spec in POSS_BALL:
+        if a <= f <= b:
+            break
+    else:
+        raise ValueError(f)
+    if spec[0] == "hold":
+        return _poss_hold(f, spec[1])
+    if spec[0] == "loose":
+        (x1, y1), (x2, y2) = poss_player(f, spec[1]), poss_player(f, spec[2])
+        t = 0.3 if (f // 2) % 2 == 0 else 0.7
+        return x1 + (x2 - x1) * t, y1 + (y2 - y1) * t
+    (x1, y1), (x2, y2) = _poss_hold(a - 1, spec[1]), _poss_hold(b + 1, spec[2])
+    t = (f - a + 1) / float(b - a + 2)
+    return x1 + (x2 - x1) * t, y1 + (y2 - y1) * t
+
+
+def poss_frame_line(f):
+    length, width = POSS_PITCH
+    groups = []
+    for slot in range(1, POSS_REF + 1):
+        x, y = poss_player(f, slot)
+        groups.append("{:.5f},{:.5f}".format(x / length, y / width))
+    if any(a <= f <= b for a, b in POSS_BALL_NAN):
+        ball = "NaN,NaN"
+    else:
+        bx, by = poss_ball(f)
+        ball = "{:.5f},{:.5f}".format(bx / length, by / width)
+    return "{}:{}:{}".format(f + 1, ";".join(groups), ball)
+
+
+def poss_metadata_xml():
+    teams = {s: "T1" for s in POSS_HOME}
+    teams.update({s: "T2" for s in POSS_AWAY})
+    teams[POSS_REF] = "REF"
+    players = "\n".join(
+        '      <Player id="P{0}" teamId="{1}"><Name>Track {0}</Name>'
+        '<ShirtNumber>{0}</ShirtNumber></Player>'.format(s, teams[s]) for s in sorted(teams))
+    channels = "\n".join(
+        '      <PlayerChannel id="player{0}_{1}" playerId="P{0}" channelId="{1}"/>'.format(s, c)
+        for s in sorted(teams) for c in ("x", "y"))
+    refs = "\n".join(
+        '        <SplitRegister separator=",">\n'
+        '          <PlayerChannelRef playerChannelId="player{0}_x"/>\n'
+        '          <PlayerChannelRef playerChannelId="player{0}_y"/>\n'
+        '        </SplitRegister>'.format(s) for s in sorted(teams))
+    direction = ('<ProviderTeamsParameters><ProviderParameter>'
+                 '<Name>attack_direction_first_half</Name><Value>{}</Value>'
+                 '</ProviderParameter></ProviderTeamsParameters>')
+    return """<?xml version="1.0" encoding="utf-8"?>
+<main>
+  <Metadata>
+    <GlobalConfig>
+      <FileName>synthetic_poss_fixture</FileName>
+      <FrameRate>25</FrameRate>
+      <FieldSize><Width>105</Width><Height>68</Height></FieldSize>
+    </GlobalConfig>
+    <Teams>
+      <Team id="T1"><Name>Alpha FC</Name>{d1}</Team>
+      <Team id="T2"><Name>Beta Club</Name>{d2}</Team>
+    </Teams>
+    <Players>
+{players}
+    </Players>
+    <PlayerChannels>
+{channels}
+    </PlayerChannels>
+  </Metadata>
+  <DataFormatSpecifications>
+    <DataFormatSpecification endFrame="{n}" separator=":" startFrame="1">
+      <StringRegister name="frameCount"/>
+      <SplitRegister separator=";">
+{refs}
+      </SplitRegister>
+      <SplitRegister separator=",">
+        <BallChannelRef channelId="x"/>
+        <BallChannelRef channelId="y"/>
+      </SplitRegister>
+    </DataFormatSpecification>
+  </DataFormatSpecifications>
+</main>
+""".format(d1=direction.format("left_to_right"), d2=direction.format("right_to_left"),
+           players=players, channels=channels, refs=refs, n=POSS_N)
+
+
+def poss_events_json():
+    import json
+    names = {"T1": "Alpha FC", "T2": "Beta Club"}
+    data = []
+    for i, (period, kind, subs, team, a, b) in enumerate(POSS_EVENTS, 1):
+        if subs is None:
+            sub = None
+        elif len(subs) == 1:
+            sub = {"name": subs[0], "id": 0}
+        else:
+            sub = [{"name": s, "id": 0} for s in subs]
+        data.append({"index": i, "team": {"name": names[team], "id": team},
+                     "type": {"name": kind, "id": 0}, "subtypes": sub,
+                     "start": {"frame": a + 1, "time": (a + 1) / 25.0, "x": None, "y": None},
+                     "end": {"frame": b + 1, "time": (b + 1) / 25.0, "x": None, "y": None},
+                     "period": period, "from": None, "to": None})
+    return json.dumps({"data": data, "metadata": []}, indent=1) + "\n"
+
+
+def poss_dead_csv():
+    rows = ["frame,dead,p_dead,llr_dead"]
+    for f in range(POSS_N):
+        dead = int(any(a <= f <= b for a, b in POSS_DEAD))
+        rows.append("{},{},{:.4f},{:.3f}".format(f, dead, float(dead), 2.0 if dead else -2.0))
+    return "\n".join(rows) + "\n"
+
+
 def main():
     os.makedirs(OUT, exist_ok=True)
+    with open(os.path.join(OUT, "fixture_poss_atd.xml"), "w") as handle:
+        handle.write(poss_metadata_xml())
+    with open(os.path.join(OUT, "fixture_poss_atd.txt"), "w") as handle:
+        for video_frame in range(POSS_N):
+            handle.write(poss_frame_line(video_frame) + "\n")
+    with open(os.path.join(OUT, "fixture_poss_events.json"), "w") as handle:
+        handle.write(poss_events_json())
+    with open(os.path.join(OUT, "fixture_poss_dead.csv"), "w") as handle:
+        handle.write(poss_dead_csv())
+    with open(os.path.join(OUT, "fixture_poss_tags.xml"), "w") as handle:
+        handle.write(smart_tagging_xml([(c, a / float(FPS), b / float(FPS), t, k)
+                                        for c, a, b, t, k in POSS_TAGS], half_split=1000))
     with open(os.path.join(OUT, "fixture_flip_atd.xml"), "w") as handle:
         handle.write(flip_metadata_xml())
     with open(os.path.join(OUT, "fixture_flip_atd.txt"), "w") as handle:

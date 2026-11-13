@@ -674,3 +674,503 @@ B1 0 m -> `0-0.1`; B2 5 x 0.034 = 0.17 m -> `0.1-0.25`; B3 0.68 m -> `0.5-1`; B4
 **Unchanged.** On `fixture_speed_atd.*` every existing row is identical, and with the default
 1 s window (25 frames) there are no displacement windows (12 frames): every share is NaN and
 `n_frames` 0.
+
+# Possession fixture (`poss_*.py`)
+
+`fixture_poss_atd.txt` / `.xml` (2,000 frames, frame_id 1..2000 = video 0..1999), with
+`fixture_poss_events.json` (true labels, open Metrica events format),
+`fixture_poss_tags.xml` (Smart Tagging pseudo-labels) and `fixture_poss_dead.csv` (the
+`deadball.run` output format: `frame,dead,p_dead,llr_dead`). Built by `make_fixtures.py`
+(`POSS_*` constants). Run with `--frames 0-999,1000-1999 --pitch 105 68`.
+
+## Design
+
+- **Slots.** 11 groups of `x,y` (no speed field, like Sample Game 3): slots 1-5 home `T1`
+  "Alpha FC" (slot 1 the goalkeeper), 6-10 away `T2` "Beta Club" (slot 6 the goalkeeper),
+  slot 11 a referee (`teamId="REF"`, not a `<Team>`). The metadata declares
+  `attack_direction_first_half`: T1 `left_to_right`, T2 `right_to_left`.
+- **Movement.** Goalkeepers stand at x = 5 / 100 m (swapped in half 2), y = 34. Each team's
+  four outfielders sit at the team centroid plus (dx, dy) = (-6, -15), (-6, 15), (6, -8),
+  (6, 8) m, dy times a width scale: 1.0 for the team in possession, 0.6 for the other, ramped
+  linearly over 25 frames after 300, 550 and 1400. Home outfield centroid x (half 1): 40 m
+  until 50, +1 m/s to 50 m at 300, -1 m/s to 42 m at 500, still to 549, +1 m/s from 550. Away =
+  home + 10 m. Half 2: away centroid 50 m until 1050, +1 m/s to 64 m at 1400, -1 m/s after;
+  home = away + 10 m. Referee at the midpoint of the two centroids, y = 60.
+- **Ball.** Held 0.5 m in +x of a player, or in flight on a straight line between two hold
+  points (`POSS_BALL`). Planted: a 3 s home carry (slot 2, 100-174), a home pass chain
+  2 -> 3 -> 5 -> 4 (175-244), an intercepted pass 4 -> away 8 (280-299), an away touch without
+  control (away 7 holds the ball 700-729 and passes it to home 5, 730-739; the events keep home
+  in possession), and a contested loose ball between home 3 and away 10 (1200-1210: 30% of the
+  way from home 3 to away 10 on frames with f // 2 even, 70% on the others, so the nearest
+  team flips every two frames while away keeps possession).
+
+| | frames (video, inclusive) |
+|---|---|
+| dead | 0-49 (before the kick-off), 500-549 (ball out by away, throw-in by home at 550), 1000-1049 (before the second kick-off) |
+| home `H` | 50-299, 550-999, 1400-1999 |
+| away `A` | 300-499, 1050-1399 |
+| ball missing | 0-29, 150-152, 250-261, 400-449, 480-555, 1000-1039, 1100-1112, 1300-1424, 1990-1999 |
+
+**Events** (`POSS_EVENTS`, video frames; the JSON stores `frame_id` = video + 1): kick-off T1
+at 50; passes and a carry by T1; `BALL LOST` T1 280-300 then `RECOVERY` T2 at 300; T2 passes;
+`BALL OUT` T2 480-500; `CARD` T2 at 520; `SET PIECE / THROW IN` T1 at 550; a ground challenge
+won by T1 and lost by T2 at 700; a T1 carry 710-760. Half 2: kick-off T2 at 1050; an aerial
+challenge won by T2 at 1200; `BALL LOST` T2 1380-1400 then `RECOVERY` T1 at 1400; a T1 carry.
+
+**Tags** (`POSS_TAGS`, frames, end exclusive; team names in the tags are "Alpha" and "Beta
+Club", so the map to the metadata names "Alpha FC" / "Beta Club" goes through shared tokens):
+
+| code | frames | team | pseudo-label |
+|---|---|---|---|
+| `build up` (lower case) | 60-290 | Alpha | H |
+| DEFENDING IN MIDDLE THIRD | 60-290 | Beta Club | H (the tagged team defends) |
+| PROGRESSION | 310-490 | Beta Club | A |
+| `Long Ball` | 320-360 | Alpha | H: disagrees with PROGRESSION, so 320-359 are dropped |
+| SET PIECES | 540-560 | N/A | ignored |
+| PROGRESSION | 700-750 | N/A | dropped (no team) |
+| DEFENSIVE TRANSITION | 1100-1390 | Alpha | A |
+| ATTACKING TRANSITION | 1410-1600 | Alpha | H |
+| BALL IN THE BOX | 1500-1550 | Alpha | ignored |
+| SET PIECES (Kick Off (Start)) | 25-60 | Alpha | ignored (used by `poss_restarts.py`) |
+| SET PIECES (Kick Off (Start)) | 1040-1060 | Beta Club | ignored (used by `poss_restarts.py`) |
+
+## Rules (decided before coding)
+
+**Live mask.** Live = graded and `dead == 0`. From `--dead CSV`: `dead` is 1 dead, 0 live, -1
+not decoded; -1 and frames missing from the CSV are not live. From `--events` (reference game):
+the union of three rules, end exclusive. (1) A restart is a `SET PIECE` event or any event
+with subtype `GOAL KICK`. A half's first restart is preceded by dead frames from the half's
+first graded frame; every later restart by dead frames from the `end` of the last event that
+starts strictly before it (skipping `CARD`) up to the restart's `start`. (2) After `BALL OUT`,
+or a `SHOT` with subtype `OUT`, dead from its `end` to the start of the next event that starts
+later. (3) After an event with subtype `END HALF`, dead to the end of the half. Otherwise
+frames after a half's last event stay live (the `--frames` range ends the half). With both
+`--events` and `--dead`, `--dead` sets the live mask. In this fixture rule (2) adds nothing
+(`BALL OUT` ends at 500, the `CARD` starts at 520, both inside the restart's dead frames).
+Rules (1) with a same-frame `RECOVERY` and a goal kick, (2) without a restart, and (3) are
+unit-tested on small event lists in `test_poss_common.py`.
+
+**True labels (`--events`).** On a live frame, the team of the most recent controlled event
+(`PASS`, `CARRY`, `RECOVERY`, `SHOT`, `SET PIECE`) whose start is on or before it, in the same
+half. `BALL LOST`, `BALL OUT`, `CHALLENGE`, `FAULT RECEIVED` and `CARD` never change it.
+
+**Pseudo-labels (`--tags`).** `PHASE_TO_POSSESSION` maps each code to `has` (the tagged team
+has the ball), `defends` (the other team has it) or `ignore`; codes match case-insensitively.
+`N/A` or unmapped teams are dropped. A live frame gets a label if every mapped tag covering it
+says the same team; frames where they disagree are dropped. Agreement per code: over the
+frames where the code labels and at least one other code labels too, the share where every
+other code gives the same team (NaN when there are none).
+
+**Changes.** A change is the first frame of the other team after a labelled frame of one team,
+with no non-live frame in between (the previous labelled frame is in the same live run). For
+pseudo-labels the previous labelled frame may be any distance back within the run.
+
+**Interpolation.** A live gap (a run of missing ball inside one live run) of at most
+`--max-interp-frames` (12) frames is filled linearly when the ball is observed on both
+neighbours, which must belong to the same live run. A gap touching a live-run edge (a dead
+frame, a half edge) is never filled.
+
+**`poss_ball_live.py`.** Gaps are runs of missing ball inside live runs; bins are half-open
+`[0,0.5) [0.5,2) [2,5) [5,inf)` s on length / fps. "Around changes": live frames within
+`--change-window-s` (2 s = 50 frames) of a change, `|f - change| <= 50`; "rest": the other
+live frames.
+
+## Expected: shared preparation
+
+| | events (`--events`) | dead CSV (`--dead`) |
+|---|---|---|
+| live frames | 1,850 (half 1: 900, half 2: 950) | the same |
+| dead frames | 150 | the same |
+| labels | H 1,300, A 550 on live frames; 5 possessions; changes at 300 and 1400 | (`--tags`) labelled 850, dropped 40; changes at 310 and 1410 |
+
+Slot teams: 5 home, 5 away, 1 other. Attack direction from the metadata: home +x in half 1,
+-x in half 2 (away the opposite); inferred from the centroids over the first 60 s of live
+frames of each half the same (agreement 1). Tag team map: "Alpha" -> home, "Beta Club" ->
+away.
+
+Agreement per code (`--tags`): BUILD UP 230 frames, 1.0; DEFENDING IN MIDDLE THIRD 230, 1.0;
+PROGRESSION 40, 0.0; LONG BALL 40, 0.0; DEFENSIVE TRANSITION and ATTACKING TRANSITION 0,
+NaN; every other code 0, NaN.
+
+## Expected: `poss_ball_live.py`
+
+Live gaps before interpolation (frames, length, bin): 150-152 (3, <0.5), 250-261 (12, <0.5),
+400-449 (50, 2-5), 480-499 (20, 0.5-2; the rest of that raw gap is dead), 550-555 (6, <0.5;
+touches the restart), 1100-1112 (13, 0.5-2), 1300-1424 (125, >=5), 1990-1999 (10, <0.5;
+touches the half end).
+
+| | observed | interpolated | missing |
+|---|---|---|---|
+| all live (1,850) | 1,611 (0.871) | 15 (0.00811) | 224 (0.121) |
+| half 1 (900) | 809 | 15 | 76 |
+| half 2 (950) | 802 | 0 | 148 |
+
+Missing before interpolation: 239 (0.129 of live). Gaps per bin, count / frames / share of
+missing frames:
+
+| | <0.5 s | 0.5-2 s | 2-5 s | >=5 s |
+|---|---|---|---|---|
+| before | 4 / 31 / 0.130 | 2 / 33 / 0.138 | 1 / 50 / 0.209 | 1 / 125 / 0.523 |
+| after | 2 / 16 / 0.0714 | 2 / 33 / 0.147 | 1 / 50 / 0.223 | 1 / 125 / 0.558 |
+
+Gap length quantiles before interpolation (lengths 3, 6, 10, 12, 13, 20, 50, 125 frames; numpy
+linear): p10 5.1 fr = 0.204 s, p50 12.5 fr = 0.5 s, p90 72.5 fr = 2.9 s.
+
+Interpolation cap sensitivity (`--interp-also 6,25`), frames filled: cap 6 -> 3 (only
+150-152; 550-555 has no observed left neighbour); cap 12 -> 15; cap 25 -> 28 (adds 1100-1112;
+480-499 ends at a dead frame).
+
+Dead frames: 150, ball missing on 120 (0.8).
+
+Around changes (2 windows of 101 frames, 202 frames; rest 1,648), missing before / after
+interpolation:
+
+| labels | around | rest |
+|---|---|---|
+| events (changes 300, 1400) | 87 (0.431) / 75 (0.371) | 152 (0.0922) / 149 (0.0904) |
+| tags (changes 310, 1410) | 67 (0.332) / 65 (0.322) | 172 (0.104) / 159 (0.0965) |
+
+Without labels the change rows are NaN with `n_changes` 0.
+
+**`--degrade`** (seed 0): only live frames lose the ball; the missing share of live frames
+reaches at least `--missing-share` and exceeds it by less than one burst; the same seed gives the
+same arrays. Track fragmentation with `--frag-gap-frames 0` keeps, on every frame, the same
+multiset of (team, x, y) over present slots; with the default gap, every lost position is
+within `--frag-gap-frames` frames after a break.
+
+## Expected: `poss_carries.py`
+
+**Rules (decided before coding).** Ball = the interpolated ball (observed or interpolated
+frames). Velocities are backward differences over `--lag` (5) frames, `(p[f] - p[f-5]) x 25 / 5`,
+defined only if both frames are in the same live run with the position available. A frame is a
+carry candidate for a player of either team (not team -1) if the ball is within `--carry-dist-m`
+(1.5 m) of the player and `|v_ball - v_player| < --carry-dv` (2 m/s); the carrier is the nearest
+candidate. A carry is a maximal run of frames with the same carrier slot, kept if it lasts at
+least `--carry-min-s` (0.5 s = 13 frames, `ceil(0.5 x 25)`). The carry team is the slot's team.
+Frame score: +1 on home carry frames, -1 on away, NaN elsewhere. Window w: the centred mean of
+the score over the defined frames of `[f - h, f + h]` inside the live run,
+`h = round(w x fps / 2)`; window `0` is the frame itself. `auc`: AUC of the score (NaN as 0) for
+"home has the ball" over labelled live frames, ties counted half; `auc_defined`: the same over
+frames with a defined score; `coverage`: share of live frames with a defined score. Precision:
+labelled carry frames whose carry team is the label. Switches: the first frame of a carry whose
+team differs from the previous carry in the same live run. Timing: for each change, the nearest
+switch to the same team within `--timing-window-s` (5 s); error = switch - change (s). Switch
+precision: switches with a same-team change within 5 s. Fast ball: live frames with a ball
+speed above `--fast-ball-ms` (15 m/s); `near_rate` = share of them with the ball within
+1.5 m of a player (distance only), `carry_rate` = share inside carries.
+
+**Why these frames.** Every hold puts the ball 0.5 m in +x of the holder, so on hold frames the
+ball moves exactly with the holder (velocity difference 0). The first 5 frames of a hold are
+not candidates: the ball at f - 5 was still in a pass flight (at least 0.81 m per frame, so the
+velocity difference is at least 3 m/s), or missing, or before the live run. The nearest
+opponent to any hold point is 1.80 m away (away 7's hold vs home 4), the rest at least 2.69 m.
+Pass flights are at least 20 m/s. The 13-frame interpolated gap 1100-1112 is not filled, so it
+splits away 9's hold in two; the filled 250-261 lies on home 4's straight path.
+
+| carry | frames | length (s) | team | true label |
+|---|---|---|---|---|
+| C1 | 55-89 | 35 (1.40) | H (slot 4) | H |
+| C2 | 105-174 | 70 (2.80) | H (slot 2; 150-152 interpolated) | H |
+| C3 | 195-209 | 15 (0.60) | H (slot 3) | H |
+| - | 230-239 | 10: too short (home 5) | | |
+| C4 | 250-279 | 30 (1.20) | H (slot 4) | H |
+| C5 | 305-339 | 35 (1.40) | A (slot 8) | A |
+| C6 | 360-399 | 40 (1.60) | A (slot 9) | A |
+| C7 | 455-479 | 25 (1.00) | A (slot 10; 450-454 have no ball at f - 5) | A |
+| C8 | 561-699 | 139 (5.56) | H (slot 3) | H |
+| C9 | 705-729 | 25 (1.00) | A (slot 7, the touch without control) | **H** |
+| C10 | 745-999 | 255 (10.20) | H (slot 5) | H |
+| C11 | 1055-1099 | 45 (1.80) | A (slot 9) | A |
+| C12 | 1118-1199 | 82 (3.28) | A (slot 9) | A |
+| C13 | 1216-1299 | 84 (3.36) | A (slot 10) | A |
+| C14 | 1430-1989 | 560 (22.40) | H (slot 2) | H |
+
+14 carries, 1,440 frames: coverage 1440 / 1850 = 0.778 of live frames. Duration bins
+`0.5-1s` 1, `1-2s` 7, `2-5s` 3, `5-10s` 1, `>=10s` 2. Length quantiles (frames 15, 25, 25, 30,
+35, 35, 40, 45, 70, 82, 84, 139, 255, 560): p10 25 fr = 1.0 s, p50 42.5 fr = 1.7 s, p90 220.2 fr
+= 8.808 s.
+
+**Events labels.** Precision 1415 / 1440 = 0.983; home carries 1,104 frames, precision 1.0;
+away carries 336 frames, 311 correct, 0.926. Window 0: H frames 1,300 (score +1 on 1,104, -1 on
+25, 0 on 171), A frames 550 (-1 on 311, 0 on 239): `auc` = (1104 x 550 + 171 x 311 + 0.5 x (171
+x 239 + 25 x 311)) / (1300 x 550) = 684703 / 715000 = 0.958; `auc_defined` = (1104 + 12.5) /
+1129 = 0.989; `coverage` 0.778. Switches: 305 (A), 705 (A), 745 (H), 1430 (H). Changes 300 (to
+A) and 1400 (to H) match 305 and 1430: errors +0.2 s and +1.2 s, matched 2 of 2; p25 0.45, p50
+0.7, p75 0.95 s, median absolute 0.7 s. Switch precision 2 / 4 = 0.5.
+
+**Tags (pseudo-labels).** Labelled carry frames: C1 30 (60-89), C2 70, C3 15, C4 30, C5 10
+(310-319; 320-339 are dropped), C6 40, C7 25, C12 82, C13 84, C14 170 (1430-1599); C8-C11 have
+no label. 556 frames, all correct: precision 1.0 (home 315, away 241). Changes 310 (to A) and
+1410 (to H): errors -0.2 s and +0.8 s, p50 0.3 s; switch precision 0.5.
+
+**Fast ball.** No carry frame has a fast ball (the ball moves with a player at about 1 m/s):
+`carry_rate` 0. `near_rate` is checked against a per-frame loop in the test.
+
+## Expected: `poss_pass_chains.py`
+
+**Rules (decided before coding).** Contacts: runs of one carrier slot (the carry candidate test
+of `poss_carries.py`: distance and velocity difference) lasting at least `--touch-min-s` (0.2 s
+= 5 frames); consecutive contacts of the same slot in the same live run merge into one (the
+ball lost and refound by the same player). A pass links two consecutive contacts in the same live
+run when both slots are of the same team, the slots differ, the gap from the first contact's
+end to the second's start is at most `--pass-max-s` (5 s), and the largest defined ball speed
+on the frames after the first contact up to and including the second contact's start exceeds
+`--pass-min-ms` (5 m/s); with no defined speed there, it is not a pass. A chain is a maximal run
+of contacts linked by passes; its length is its number of passes, its team the contacts' team,
+its frames run from the first contact's start to the last contact's end. The proxy fires on
+chains of at least `--min-chain` (2) passes: score +1 (home) / -1 (away) on their frames.
+Precision per chain-length bin (`1`, `2`, `3`, `4`, `5+`) and for chains of at least
+`--min-chain`: labelled chain frames whose label is the chain team. Switches: the first frame
+of a qualifying chain whose team differs from the previous qualifying chain in the same live
+run.
+
+**Contacts.** The 14 carries plus home 5's 230-239 (10 frames, long enough for a contact):
+K1 55-89 H4, K2 105-174 H2, K3 195-209 H3, K4 230-239 H5, K5 250-279 H4, K6 305-339 A8,
+K7 360-399 A9, K8 455-479 A10, K9 561-699 H3, K10 705-729 A7, K11 745-999 H5,
+K12 1055-1099 A9 and K13 1118-1199 A9 (merged: same slot, 1055-1199), K14 1216-1299 A10,
+K15 1430-1989 H2. 14 contacts after merging.
+
+**Passes.** K1 -> K2, K2 -> K3, K3 -> K4, K4 -> K5 (home; flights of 20 to 67 m/s, gaps of
+0.2 to 0.64 s); K6 -> K7 (away); K12/13 -> K14 (away; the ball jumps about 16 m to the loose
+ball, over 80 m/s). Not passes: K5 -> K6 (other team), K7 -> K8 (the whole flight
+400-449 is missing and 450-454 have no ball at f - 5, so no speed is defined), K9 -> K10 and
+K10 -> K11 (other team); K8 -> K9 and K11 -> K12 cross a dead stretch. 6 passes: home 4, away 2.
+
+**Chains.** K1-K5 home, 4 passes, frames 55-279 (225); K6-K7 away, 1 pass, 305-399 (95);
+K12/13-K14 away, 1 pass, 1055-1299 (245). Length bins: `1` 2, `4` 1, others 0. Chains of at
+least 2: one, 225 frames, coverage 225 / 1850 = 0.122; chains of at least 1: 565 frames
+(0.305).
+
+**Events labels.** Precision: chains of at least 2, 225 frames, 1.0; bin `1`, 340 frames, 1.0;
+bin `4`, 225 frames, 1.0. Window 0: home frames 1,300 (225 at +1, 1,075 at 0), away 550 (all
+0): `auc` = (225 x 550 + 0.5 x 1075 x 550) / (1300 x 550) = 762.5 / 1300 = 0.587;
+`auc_defined` NaN (no away frame has a defined score). No switch (one qualifying chain): 0 of 2
+changes matched. With `--min-chain 1`: switch at 305 (away; the K12/13-K14 chain is the first
+of its run), change 300 matched with error +0.2 s, event precision 1 / 1.
+
+**Tags.** Chains of at least 2: labelled frames 60-279 (220), precision 1.0.
+
+## Expected: `poss_shape.py`
+
+**Rules (decided before coding).** Per team and live frame, over its present players (team 0 or
+1, x and y finite), in the team's attacking frame (x toward the opponent goal, `toward_goal`):
+the deepest player (smallest attacking-frame x) is taken as the goalkeeper and dropped; the
+features use the rest ("outfield"), and need at least `--min-players` (3) of them, else NaN.
+`width` = y range; `length` = attacking-frame x range; `hull_area` = convex hull area (m^2);
+`centroid_advance` = mean attacking-frame x; `centroid_velocity` = the median, over outfield
+players, of each player's x velocity (backward difference over `--lag` of its own slot inside
+the live run), in the team's attacking frame (m/s; all players move together here, so it equals
+the centroid's velocity); `line_depth` = attacking-frame x of the deepest outfield
+player (metres from the own goal line); `goal_side` = share of outfield players with
+attacking-frame x below the ball's (interpolated ball), or below the opponent outfield
+centroid's when the ball is missing. Hypothesis: the possessing team has the larger value, except
+`goal_side` (the smaller). Score toward "home has the ball" = sign x (home - away), sign +1, or
+-1 for `goal_side`. `diff` rows: possessing minus defending team, on labelled live frames with
+both values defined (mean, median, n), for all frames, ball present (observed or interpolated)
+and ball missing. Separation per window as for carries, computed three times: over all
+labelled live frames, those with the ball present, and those with it missing (the split uses the
+frame's own ball flag; the window may mix both). `line_depth` quantiles per team on labelled
+frames where that team defends, and where it attacks.
+
+**Frame 200** (home has the ball, half 1, home centroid 46 m, away 56 m, home width scale 1,
+away 0.6; the ball 0.5 m in front of home 3 at (40, 49), so at (40.5, 49)). Home outfield
+(40, 19), (40, 49), (52, 26), (52, 42): width 30, length 12, hull 276, advance 46, velocity +1,
+line depth 40, goal side 2 of 4 = 0.5. Away outfield (50, 25), (50, 43), (62, 29.2),
+(62, 38.8), attacking-frame x 55, 55, 43, 43: width 18, length 12, hull 165.6, advance 49,
+velocity -1, line depth 43, goal side 4 of 4 = 1.0 (the ball is at 64.5 in their frame).
+Scores: width +12, length 0, hull +110.4, advance -3, velocity +2, line depth -3, goal side
++0.5.
+
+**Frame 420** (away has the ball, ball missing, home centroid 45.2 m, away 55.2 m): goal side
+uses the opponent centroid; every outfield player of both teams is goal-side of it (home x
+39.2 and 51.2 below 55.2; away attacking-frame x 55.8 and 43.8 below 59.8): 1.0 and 1.0,
+score 0.
+
+**Coverage.** Every feature is defined on all 1,850 live frames (all players tracked), except
+`centroid_velocity`, which needs the frame 5 earlier in the same live run: undefined on the
+first 5 frames of each of the 3 live runs, 1835 / 1850 = 0.992. Positions are written with 5
+decimals, so values match within 0.01 m, and hull areas within 0.05 m^2.
+
+**Width and hull.** Off the ramps the possessing team's width is 30 and the defender's 18
+(hull 276 and 165.6), so possessing minus defending is +12 (+110.4). On the 75 ramp frames
+(three ramps of 25 after 300, 550 and 1400) it is -12 + 0.96 k, k = 0..24, for both label
+sources. `diff` width: mean (1775 x 12 + 75 x -0.48) / 1850 = 11.494, median 12; hull: mean
+105.75, median 110.4. Length: possessing minus defending is 0 up to position rounding (median
+0 within 0.01 m). Window-0 `auc` for width (events): home frames 1,250 at +12 and 2 x 25 ramp
+values -12 + 0.96 j; away frames 525 at -12 and 25 ramp values 12 - 0.96 k. Wins 1250 x 549 +
+24 x 2 x 525 + 2 x 276 = 712,002 (276 pairs with j + k > 25), ties 1250 + 2 x 525 + 2 x 24 =
+2,348 (equal values, which position rounding may break either way): `auc` = (712002 + 1174) /
+715000 = 0.9974, within +-0.0017.
+
+**Line depth** (events labels; numpy linear quantiles of the analytic values): home
+defending (550 frames: 44 - 0.04 i, i < 200, and 39 - 0.04 j, j < 350): p25 30.53, p50 36.02,
+p75 38.76 m. Away defending (1,300 frames: 49 - 0.04 i, i < 250; 47 - 0.04 i, i < 450; 58 -
+0.04 i, i < 600): p25 38.03, p50 42.68, p75 47.01 m. Home attacking (34 + 0.04 i, i < 250;
+36 + 0.04 i, i < 450; 25 + 0.04 i, i < 600): p25 35.99, p50 40.32, p75 44.97 m. Away attacking
+(39 + 0.04 i, i < 200; 44 + 0.04 j, j < 350): p25 44.24, p50 46.98, p75 52.47 m. Within 0.01 m
+(position rounding).
+
+## Expected: `poss_ball_field.py`
+
+**Rules (decided before coding).** Scores toward "home has the ball", in home's attacking
+frame (x toward the away goal), NaN where undefined:
+- `ball_position`: interpolated ball x minus half the pitch length (positive = ball in the away
+  half).
+- `ball_direction`: the sign of the ball's x velocity (backward difference over `--lag` inside
+  the live run), NaN when |vx| < `--min-ms` (0.5 m/s).
+- `team_drift`: +1 when both teams (median outfield player x velocity, as in `poss_shape.py`)
+  move toward the away goal at `--min-ms` or more, -1 when both move toward the home goal at that speed, NaN
+  otherwise.
+Separation per window as for carries. `thirds`: for each team T, labelled live frames with the
+ball present, by the ball's third in T's attacking frame (`defensive` [0, 35), `middle`
+[35, 70), `attacking` [70, 105]; x outside the pitch clipped), the share where T has the ball.
+
+**Team drift (by hand).** Both centroids move together at 1 m/s: toward the away goal (home's
+frame) on 50-299, 550-999 and 1400-1999, toward the home goal on 300-499 and 1050-1399. The
+velocity over 5 frames is NaN on the first 5 frames of each live run (50-54, 550-554, 1050-1054)
+and, around each reversal, takes the values 1, 0.6, 0.2, -0.2, -0.6, -1: in home's frame
++1, +0.6, +0.2, -0.2, -0.6 on frames 300-304, and -1, -0.6, -0.2, +0.2, +0.6 on 1400-1404. So
+300-301 score +1 under away labels, 1400-1401 score -1 under home labels, and 302-303, 1402-1403
+are NaN. Window 0: home frames 1,300 = 1,286 at +1, 12 at 0 (NaN), 2 at -1; away frames 550 =
+541 at -1, 7 at 0, 2 at +1. `auc` = (1286 x 548 + 12 x 541 + 0.5 x (1286 x 2 + 12 x 7 + 2 x 541))
+/ 715000 = 713089 / 715000 = 0.9973; `auc_defined` = (1286 x 541 + 0.5 x (1286 x 2 + 2 x 541))
+/ (1288 x 543) = 697553 / 699384 = 0.9974; coverage 1831 / 1850 = 0.9897.
+
+**Spot values.** Frame 200 (ball at x 40.5, moving with home 3): `ball_position` -12,
+`ball_direction` +1, `team_drift` +1. Frame 420 (ball missing, away possession):
+`ball_position` and `ball_direction` NaN, `team_drift` -1. Frame 1500 (half 2, home attacks -x,
+ball 0.5 m in front of home 2 at x = cA + 4.5 with cA = 60): ball x in home's frame 105 - 64.5
+= 40.5, `ball_position` -12; the ball moves -1 m/s in absolute x, +1 in home's frame.
+
+**Ball position, ball direction, thirds.** Continuous in the fixture, so the test recomputes
+them from the fixture text with a plain per-frame loop (its own parser, interpolation of the two
+short gaps 150-152 and 250-261, and a pairwise AUC count) and requires exact agreement.
+
+## Expected: `poss_reversal.py`
+
+**Rules (decided before coding).** Per team, the median outfield player x velocity (as in
+`poss_ball_field.py`) in home's attacking frame. Direction state per live run, with hysteresis:
++1 once the velocity is at least `--min-ms` (0.5 m/s), -1 once it is at most -0.5, unchanged
+in between; the first state in a run is not a flip. A flip is a frame where the state changes.
+A home flip is joint when an away flip to the same direction lies within
+`--reversal-window-s` (1 s = 25 frames); the joint reversal is at the later of the two (the
+nearest away flip), and its new direction names the implied new possessor (+1: home attacks, so
+home; -1: away). Rate: joint reversals per minute of live play. Null: away flips shifted
+circularly within their half by the `--null-*` offsets, joint reversals recounted; `p_emp` =
+(1 + shifts with at least the real count) / (1 + shifts). Timing against label changes as for
+carries. Change detection: indicator 1 on reversal frames, 0 on other live frames, smoothed per
+window; AUC for "a label change within `--change-window-s` (1 s) of the frame". State: after a
+joint reversal, the implied possessor holds until the next one in the live run (NaN before the
+first); separation per window as for carries. Profile: each team's centroid velocity in the
+attacking frame of the team gaining possession, pooled per 1 s bin over -10 s .. +10 s around
+the label changes (window clipped to the half; undefined frames, e.g. dead, not counted), with
+the changes shifted circularly within each half as the null.
+
+**By hand.** The centroid velocities (both teams equal) are those of the team-drift rule:
++1 on 55-301 (+0.6 at 301), +0.2 at 302, -0.2 at 303, -0.6 at 304, -1 on 305-499; +1 on
+555-999; -1 on 1055-1400, -0.6 at 1401, -0.2, +0.2, +0.6 at 1404, +1 on 1405-1999. Flips:
+home and away both at 304 (to -1) and 1404 (to +1). 2 joint reversals: 304 (away), 1404
+(home). Rate 2 / (1850 / 1500 min) = 1.62 per minute. With `--null-min-shift 5` every shift
+is 125-875 frames in a 1,000-frame half, so no shifted away flip lies within 25 frames of a home
+flip: null mean 0, `p_emp` 1 / (N + 1). With the default 60 s the halves are too short and the
+null is skipped.
+
+Timing (events: changes 300 to away, 1400 to home): errors +0.16 s and +0.16 s, 2 of 2
+matched, event precision 1.0. Tags (changes 310, 1410): -0.24 s and -0.24 s.
+
+Change detection (events; positives 275-325 and 1375-1425, 102 frames; negatives 1,748):
+window 0: (2 x 1748 + 0.5 x 100 x 1748) / (102 x 1748) = 52 / 102 = 0.510; window 1 s (25
+frames, h = 12): 50 frames at 1/25 (292-316 and 1392-1416), all positives: (50 + 0.5 x 52) /
+102 = 0.745.
+
+State (events): away on 304-499, home on 1404-1999, NaN elsewhere. Window 0: home frames
+596 at +1, 704 at 0; away frames 196 at -1, 354 at 0: `auc` = (596 x 550 + 704 x 196 + 0.5 x
+704 x 354) / 715000 = 590392 / 715000 = 0.826; `auc_defined` 1.0; coverage 792 / 1850 = 0.428.
+
+Profile (events, gainer's frame): before both changes -1; bin [0, 1 s) = (-1 - 0.6 - 0.2 +
+0.2 + 0.6 + 20 x 1) / 25 = 0.76 for each change; +1 after. Bins -10 .. -1: -1 (bin -10 counts
+20 + 25 = 45 frames: 50-54 have no velocity); bin 0: 0.76; bins 1 .. 9: +1 (bins 8 and 9 count
+only the 1400 change's 25 frames each: 500-549 are dead). The same for both teams.
+
+## Expected: `poss_contested.py`
+
+**Rules (decided before coding).** Nearest team on a live frame with the (interpolated) ball:
+the team of the nearest player of either team (referees excluded); undefined without a ball.
+A flip is a frame whose nearest team differs from the previous frame's, both defined and in the
+same live run. Flip density at window w: the flip indicator (1 on flips, 0 on other defined
+frames) averaged over the centred window, in flips per second (x fps). Contested: at least 2
+flips within the `--flip-window-s` (2 s, h = 25) window around the frame. Contexts on live
+frames: `around_change` within `--context-s` (1.5 s = 38 frames, rounded) of a label change;
+`loose_no_change` within 1.5 s of a `CHALLENGE` or `BALL LOST` event (events only) with no label
+change within `--loose-gap-s` (3 s) of it; `mid` more than `--mid-margin-s` (5 s) from every
+change, loose anchor and live-run edge. Per context: frames with a defined density, mean flips
+per second, contested share. Separation rows: `nearest_team` (+1 home nearest, -1 away) as for
+carries (the organisers' baseline); `contested_change`: AUC of the density for around-change vs
+mid frames; `contested_loose`: around-change vs loose-no-change frames (can it tell a turnover
+from a contest that changes nothing?).
+
+**By hand.** Changes 300 and 1400 (events). Loose anchors: `BALL LOST` 280 and 1380 are within
+3 s of a change, so dropped; the two `CHALLENGE` events at 700 and the one at 1200 stay
+(`loose_no_change` = 662-738 and 1162-1238). `around_change` = 262-338 and 1362-1438. With tags
+(no events) `loose_no_change` is empty (NaN rows) and the changes are 310 and 1410. Everything
+else (nearest team, flips, densities, context means, contested shares and the window-0 AUCs) is
+checked against an independent per-frame recomputation from the fixture text in the test.
+
+## Expected: `poss_restarts.py`
+
+**Rules (decided before coding).** A restart is the first live frame r after a run of dead
+graded frames, in the same half (a dead run that ends the half has none). Five predictions of
+the restarting team, each undefined when its evidence is missing:
+- `geometric`: on the frames r .. r + `--geom-look-s` (1 s), the first frame with a player of
+  either team more than `--touchline-m` (0.5 m) beyond a touchline (a throw-in taker: that
+  player's team) or, failing that, with a ball (interpolated): the nearest player's team.
+- `last_opposite`: the other team than the one nearest the ball on the last live frame with a
+  ball within `--last-look-s` (3 s) before the dead run (who touched it last).
+- `label_opposite`: the other team than the last labelled frame of the live run just before
+  the dead run (true labels on the reference game, pseudo-labels on the match).
+- `tag_team`: the team of the Smart Tagging `SET PIECES` tag with a mapped team (not `N/A`)
+  whose start is nearest to r within `--tag-window-s` (5 s).
+- `label_after`: the label of the first labelled frame within `--look-after-s` (5 s) from r
+  (on the reference game this is the true restart team; on the match the pseudo-label).
+Truth (reference game only): the true label at r. Per rule: defined restarts, accuracy against
+the truth. Agreement: for each pair of rules, restarts where both are defined and the share
+where they agree. No per-restart rows.
+
+**By hand.** Dead runs 0-49, 500-549, 1000-1049: restarts at 50, 550 and 1050; truth home,
+home, away. Nobody is beyond a touchline (y from 19 to 49 m; the referee at 60 m is no team).
+
+| rule | 50 | 550 | 1050 |
+|---|---|---|---|
+| geometric | home (ball with home 4) | home (ball missing to 555; at 556 with home 3) | away (away 9) |
+| last_opposite | - (half start) | home (last ball 479, with away 10) | - |
+| label_opposite | - | home (last label 499 away; tags: 489 away) | - |
+| tag_team | home (tag at 25, 1 s before) | - (only the `N/A` throw-in tag at 540) | away (tag at 1040) |
+| label_after (events) | home | home | away |
+| label_after (tags) | home (first label 60) | - (no label in 550-675) | away (first label 1100) |
+
+Accuracy with events: geometric 3 / 3, last_opposite 1 / 1, label_opposite 1 / 1, tag_team
+2 / 2, label_after 3 / 3 (all 1.0). Agreement with events: every pair with both defined agrees
+(1.0); geometric-last_opposite 1 restart, geometric-tag_team 2, geometric-label_after 3,
+last_opposite-tag_team 0 (NaN). With tags: accuracy NaN (no truth); geometric-label_after 2
+restarts, agreement 1.0.
+
+## Expected: `poss_durations.py`
+
+**Rules (decided before coding).** Reference game only (`--events`; the script refuses to run
+without it). Possessions are maximal runs of one true label inside a live run. A possession ends
+in a `turnover` (the next frame is live with the other label), a `dead` ball (the next frame is
+dead) or at the `half_end` (censored: its true length is unknown). Length in s = frames / fps.
+Rows: count, p10 / p25 / p50 / p75 / p90 and mean, counts per bin `[0,2) [2,5) [5,10) [10,20)
+[20,40) [40,inf)` s, all and per team; per end type count, share of possessions and median
+length; the turnover share among possessions that ended (turnover or dead); the mean and sample
+standard deviation (ddof 1) of ln(length in s), for a log-normal prior; and a discrete hazard per
+bin: possessions still running at the bin's start (`at_risk`), those ending in it by turnover or
+dead ball (`ends`; half-end ones are censored, never counted as ends), `hazard` = ends / at_risk.
+
+**By hand.** Possessions: home 50-299 (10 s, turnover), away 300-499 (8 s, dead), home 550-999
+(18 s, half end), away 1050-1399 (14 s, turnover), home 1400-1999 (24 s, half end). Lengths 8,
+10, 14, 18, 24 s: p10 8.8, p25 10, p50 14, p75 18, p90 21.6, mean 14.8; bins `5-10s` 1,
+`10-20s` 3, `20-40s` 1, others 0. Home: 3 (median 18 s); away: 2 (median 11 s). Ends: turnover
+2 (0.4, median 12 s), dead 1 (0.2, 8 s), half end 2 (0.4, 21 s); turnover share of ended 2 / 3.
+ln-length mean 2.618, sd 0.441. Hazard: `0-2s` 0 / 5, `2-5s` 0 / 5, `5-10s` 1 / 5 = 0.2,
+`10-20s` 2 / 4 = 0.5, `20-40s` 0 / 1, `>=40s` NaN (none at risk).
