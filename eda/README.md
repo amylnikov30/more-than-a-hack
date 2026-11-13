@@ -17,7 +17,8 @@ eda/
 │                      poss_pass_chains.py, poss_shape.py, poss_ball_field.py,
 │                      poss_reversal.py, poss_contested.py, poss_restarts.py,
 │                      poss_durations.py
-├── notebooks/         the four eda_*.ipynb + plot_helpers.py
+├── notebooks/         the four eda_*.ipynb + plot_helpers.py; eda_possession.py (the
+│                      possession notebook as a jupytext percent-format source)
 ├── reports/           the eda_*.pdf and eda_*.docx renders
 ├── docs/analyses.md   definitions and reading notes per analysis
 └── tests/             synthetic fixtures and the test suite
@@ -267,6 +268,23 @@ cd ~/more-than-a-hack && PYTHONPATH="$PWD" python3 eda/scripts/poss_restarts.py 
 The Sample Game 3 runs (clean and `--degrade`) go to `$HOME/eda_out/poss_*_sg3` and
 `$HOME/eda_out/poss_*_sg3_deg`, so the notebook finds them next to the match run; their commands
 are under "Run on Metrica Sample Game 3" below.
+
+### Possession notebook (`eda_possession.py`)
+
+The possession notebook is kept as a percent-format source (`# %%` cells, `# %% [markdown]`
+text), which Jupyter opens through jupytext and which also runs as a plain script. It reads the
+`poss_*` folders under `EDA_OUT` (default `~/eda_out`): `poss_<x>` (match), `poss_<x>_sg3` and
+`poss_<x>_sg3_deg` (Sample Game 3 clean and degraded) and `poss_durations_sg3`; missing runs
+are skipped with a note. Section 0 is the summary table (verdicts from the editable criteria in
+the first code cell) and the two scale-map heatmaps; sections 1-9 follow the scripts. To get an
+`.ipynb` without outputs, from `eda/notebooks/` (needs `pip install jupytext`):
+
+```bash
+jupytext --to ipynb eda_possession.py
+```
+
+Run it from `eda/notebooks/` (or set `EDA_DIR`) after the `poss_*` runs. As for the other
+notebooks, clear outputs before a copy leaves the VM.
 
 ### Notebook (`eda_ball_missing.ipynb`)
 
