@@ -901,3 +901,47 @@ no label. 556 frames, all correct: precision 1.0 (home 315, away 241). Changes 3
 
 **Fast ball.** No carry frame has a fast ball (the ball moves with a player at about 1 m/s):
 `carry_rate` 0. `near_rate` is checked against a per-frame loop in the test.
+
+## Expected: `poss_pass_chains.py`
+
+**Rules (decided before coding).** Contacts: runs of one carrier slot (the carry candidate test
+of `poss_carries.py`: distance and velocity difference) lasting at least `--touch-min-s` (0.2 s
+= 5 frames); consecutive contacts of the same slot in the same live run merge into one (the
+ball lost and refound by the same player). A pass links two consecutive contacts in the same live
+run when both slots are of the same team, the slots differ, the gap from the first contact's
+end to the second's start is at most `--pass-max-s` (5 s), and the largest defined ball speed
+on the frames after the first contact up to and including the second contact's start exceeds
+`--pass-min-ms` (5 m/s); with no defined speed there, it is not a pass. A chain is a maximal run
+of contacts linked by passes; its length is its number of passes, its team the contacts' team,
+its frames run from the first contact's start to the last contact's end. The proxy fires on
+chains of at least `--min-chain` (2) passes: score +1 (home) / -1 (away) on their frames.
+Precision per chain-length bin (`1`, `2`, `3`, `4`, `5+`) and for chains of at least
+`--min-chain`: labelled chain frames whose label is the chain team. Switches: the first frame
+of a qualifying chain whose team differs from the previous qualifying chain in the same live
+run.
+
+**Contacts.** The 14 carries plus home 5's 230-239 (10 frames, long enough for a contact):
+K1 55-89 H4, K2 105-174 H2, K3 195-209 H3, K4 230-239 H5, K5 250-279 H4, K6 305-339 A8,
+K7 360-399 A9, K8 455-479 A10, K9 561-699 H3, K10 705-729 A7, K11 745-999 H5,
+K12 1055-1099 A9 and K13 1118-1199 A9 (merged: same slot, 1055-1199), K14 1216-1299 A10,
+K15 1430-1989 H2. 14 contacts after merging.
+
+**Passes.** K1 -> K2, K2 -> K3, K3 -> K4, K4 -> K5 (home; flights of 20 to 67 m/s, gaps of
+0.2 to 0.64 s); K6 -> K7 (away); K12/13 -> K14 (away; the ball jumps to the loose-ball
+midpoint, over 80 m/s). Not passes: K5 -> K6 (other team), K7 -> K8 (the whole flight
+400-449 is missing and 450-454 have no ball at f - 5, so no speed is defined), K9 -> K10 and
+K10 -> K11 (other team); K8 -> K9 and K11 -> K12 cross a dead stretch. 6 passes: home 4, away 2.
+
+**Chains.** K1-K5 home, 4 passes, frames 55-279 (225); K6-K7 away, 1 pass, 305-399 (95);
+K12/13-K14 away, 1 pass, 1055-1299 (245). Length bins: `1` 2, `4` 1, others 0. Chains of at
+least 2: one, 225 frames, coverage 225 / 1850 = 0.122; chains of at least 1: 565 frames
+(0.305).
+
+**Events labels.** Precision: chains of at least 2, 225 frames, 1.0; bin `1`, 340 frames, 1.0;
+bin `4`, 225 frames, 1.0. Window 0: home frames 1,300 (225 at +1, 1,075 at 0), away 550 (all
+0): `auc` = (225 x 550 + 0.5 x 1075 x 550) / (1300 x 550) = 762.5 / 1300 = 0.587;
+`auc_defined` NaN (no away frame has a defined score). No switch (one qualifying chain): 0 of 2
+changes matched. With `--min-chain 1`: switch at 305 (away; the K12/13-K14 chain is the first
+of its run), change 300 matched with error +0.2 s, event precision 1 / 1.
+
+**Tags.** Chains of at least 2: labelled frames 60-279 (220), precision 1.0.

@@ -503,3 +503,68 @@ with a first-time pass, so carries alone cannot place most changes.
   model; `auc_defined` falling with the window shows how much of the gain is coverage.
 - Is `carry_rate` on fast balls 0 while `near_rate` is not? Then the velocity test removes the
   balls passing near or over a player, as intended.
+
+### Pass chains (`poss_pass_chains.py`)
+
+**Question.** Is "team T completes two passes in a row" (the organisers' own proxy in
+CHALLENGE.md) a reliable sign that T has the ball, how much live time does it cover, and does a
+change of chain team mark a turnover? Feeds the emission model and the change detector.
+
+**Definitions.** Contacts: runs of frames in which the ball moves with one player (the carry
+test: within `--carry-dist-m`, velocity difference below `--carry-dv`), at least
+`--touch-min-s` long; neighbouring contacts of the same slot in one live run merge. A pass links
+two consecutive contacts of different players of one team, in one live run, at most
+`--pass-max-s` apart, with a defined ball speed above `--pass-min-ms` somewhere between them
+(a flight with no defined speed, e.g. the ball missing throughout, is not a pass). A chain is a
+maximal run of contacts linked by passes; its frames run from its first contact's start to its
+last contact's end, flights included. The proxy: chains of at least `--min-chain` passes, score
++1 home / -1 away. Precision per chain length (`1` ... `5+` passes) and for the proxy. Switches:
+the first frame of a qualifying chain whose team differs from the previous qualifying chain in
+the same live run.
+
+**Defaults and why** (norms, not tuned). `--pass-min-ms 5`: a soft pass; slower balls are
+dribbles or rolling loose balls. `--pass-max-s 5`: a long ball's flight with a bounce.
+`--touch-min-s 0.2`: the shortest touch the 0.2 s velocity lag can see. `--min-chain 2`: the
+CHALLENGE.md proxy ("more than two consecutive passes" is read here as two completed passes,
+i.e. three touches; `--min-chain 3` is the strict reading). One-touch passes never move with
+the player, so they break chains: chains are undercounted, never overcounted by this.
+
+**CSV schema** (`poss_pass_chains_summary.csv`), after the shared rows (params add touch_min,
+pass_min, pass_max, min_chain, carry_dist, carry_dv):
+
+| analysis | scope | bin | metric | unit |
+|---|---|---|---|---|
+| passes | all / H / A | | n_contacts, n_passes | count |
+| chains | all | `1` `2` `3` `4` `5+` | n_chains | count |
+| coverage | all / chain / min_chain | | live_frames, frames, share | frames, share of live frames |
+| precision | length | `1` ... `5+` / `min_chain` | labelled_frames, precision | frames, share |
+| separation | chain | window s | auc, auc_defined, coverage | AUC, share |
+| timing | chain_switch | `` / p25 / p50 / p75 | as for carries | |
+
+**Tests.** `tests/test_poss_pass_chains.py`: 14 contacts, 6 passes (a flight with no defined
+speed is not a pass), chains of 4, 1 and 1 passes, coverage, precision, AUC, the switch with
+`--min-chain 1`, pseudo-labels, and the pass rule on small cases.
+
+**Results on Sample Game 3.**
+
+| | clean | degraded |
+|---|---|---|
+| passes found (home / away) | 312 / 265 (the events list 1,121 `PASS` events) | 176 / 148 |
+| chains of >= 2 passes, share of live frames | 0.562 | 0.273 |
+| precision, >= 2 passes (1 pass) | 0.977 (0.952) | 0.983 (0.973) |
+| AUC at 0 / 2 / 10 s | 0.886 / 0.896 / 0.876 | 0.727 / 0.748 / 0.780 |
+| changes matched by a chain switch within 5 s, median error | 27 of 280, 0.60 s | 10 of 280, 0.80 s |
+
+A chain names the right team about 98% of the time, and precision barely depends on its length:
+even one completed pass is 95% right. The proxy's limit is coverage, which halves on the degraded
+copy, and timing: chains are long and few, so a switch of chain team matches fewer than one
+turnover in ten.
+
+**Questions for interpretation.**
+- How many passes does the match yield per minute of live play, compared with the degraded
+  copy? Far fewer means fragmented tracks break contacts and the proxy covers little.
+- Is precision on the match close to 0.95 or more against pseudo-labels? Then "a completed pass
+  by T" can act as a near-certain anchor for T, and the model can trust it over weaker signals.
+- Does precision rise with chain length? If not (as on Sample Game 3), `--min-chain 1` buys
+  coverage at no cost.
+- Chain switches are rare and late: use chains to hold a label, not to place a change.
