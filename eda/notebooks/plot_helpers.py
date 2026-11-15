@@ -8,6 +8,16 @@ Notebooks only; the scripts stay stdlib + numpy. One look across notebooks:
     fmt_p                        p-values, "p <= 0.001" at the resolution floor
     bars_with_n                  bars annotated with n; n < MIN_N greyed and labelled
     load_summary / get / pick    read the long-format summary CSVs
+
+Possession notebook (eda_possession), added without changing anything above:
+
+    TEAM_COLOURS / team_colour   one fixed colour per team: H (Barcelona on the match) blue,
+                                 A (Athletic) orange, the validated first two TYPE slots
+    DATASETS / dataset_style     match, Sample Game 3 clean and degraded: neutral inks + markers
+    threshold                    a verdict threshold, always dashed and labelled
+    log_seconds                  log axis for durations, said in the axis label
+    annotated_heatmap            heatmap with the number written in every cell
+    poss_folder / load_poss      the poss_* summary CSVs of one dataset
 """
 
 import math
@@ -190,3 +200,86 @@ def null_k(df):
     """K (number of shifts) from the params rows, or None."""
     k = get(df, "params", "all", "", "null_n")
     return int(k) if np.isfinite(k) and k > 0 else None
+
+
+# ---------------------------------------------------------------- possession notebook
+
+TEAM_COLOURS = {"H": "#2a78d6", "A": "#eb6834"}     # = TYPE_COLOURS slots 1 and 2 (CVD-checked)
+TEAM_LABELS = {"H": "H (home; Barcelona on the match)", "A": "A (away; Athletic on the match)"}
+DATASETS = ("match", "sg3", "sg3_deg")
+DATASET_LABELS = {"match": "match (pseudo-labels)", "sg3": "Sample Game 3, clean",
+                  "sg3_deg": "Sample Game 3, degraded"}
+DATASET_STYLE = {"match": (REAL, "o"), "sg3": (INK_2, "s"), "sg3_deg": (GREYS[2], "^")}
+THRESHOLD = "#1baf7a"        # verdict thresholds: dashed, labelled on the line
+
+
+def team_colour(code):
+    return TEAM_COLOURS[str(code)]
+
+
+def dataset_style(name):
+    """(colour, marker) for a dataset; lines are solid, so dashes stay reserved for thresholds
+    and the null."""
+    return DATASET_STYLE[name]
+
+
+def threshold(ax, value, label, axis="y"):
+    """A verdict threshold: dashed line with its label written at the end of the line."""
+    if axis == "y":
+        ax.axhline(value, color=THRESHOLD, ls="--", lw=1.2)
+        ax.annotate(label, xy=(1.0, value), xycoords=("axes fraction", "data"), xytext=(-2, 3),
+                    textcoords="offset points", ha="right", va="bottom", fontsize=8,
+                    color=THRESHOLD)
+    else:
+        ax.axvline(value, color=THRESHOLD, ls="--", lw=1.2)
+        ax.annotate(label, xy=(value, 1.0), xycoords=("data", "axes fraction"), xytext=(3, -2),
+                    textcoords="offset points", ha="left", va="top", fontsize=8,
+                    color=THRESHOLD, rotation=90)
+
+
+def log_seconds(ax, what, axis="x"):
+    """Log axis for a duration that spans orders of magnitude; the label says so."""
+    if axis == "x":
+        ax.set_xscale("log")
+        ax.set_xlabel("{} (s, log scale)".format(what))
+    else:
+        ax.set_yscale("log")
+        ax.set_ylabel("{} (s, log scale)".format(what))
+
+
+def annotated_heatmap(ax, data, row_labels, col_labels, fmt="{:.2f}", vmin=0.5, vmax=1.0,
+                      cmap="cividis", nan_text="-", text=None):
+    """Heatmap with every number written in its cell (dark text on light cells, light on dark).
+    cividis is perceptually uniform and readable with colour-vision deficiencies. `text`
+    (same shape) writes other numbers than the ones coloured, e.g. signed errors coloured by
+    their size."""
+    data = np.asarray(data, dtype=float)
+    text = data if text is None else np.asarray(text, dtype=float)
+    im = ax.imshow(np.ma.masked_invalid(data), cmap=cmap, vmin=vmin, vmax=vmax, aspect="auto")
+    ax.set_xticks(range(len(col_labels)), col_labels)
+    ax.set_yticks(range(len(row_labels)), row_labels)
+    ax.grid(False)
+    cm = plt.get_cmap(cmap)
+    for i in range(data.shape[0]):
+        for j in range(data.shape[1]):
+            v = data[i, j]
+            if not np.isfinite(v):
+                ax.text(j, i, nan_text, ha="center", va="center", fontsize=8, color=INK_3)
+                continue
+            r, g, b, _ = cm((min(max(v, vmin), vmax) - vmin) / float(vmax - vmin))
+            dark = 0.299 * r + 0.587 * g + 0.114 * b > 0.55
+            ax.text(j, i, fmt.format(text[i, j]), ha="center", va="center", fontsize=8,
+                    color=REAL if dark else "white")
+    return im
+
+
+def poss_folder(script, dataset):
+    """Output folder of a poss_* script for a dataset: poss_<x>, poss_<x>_sg3, poss_<x>_sg3_deg
+    (as in eda/README.md)."""
+    return "poss_{}{}".format(script, "" if dataset == "match" else "_" + dataset)
+
+
+def load_poss(eda_out, script, dataset):
+    """The summary of poss_<script> for one dataset, or None (with a note) if not run."""
+    return load_summary(eda_out, poss_folder(script, dataset),
+                        "poss_{}_summary.csv".format(script))

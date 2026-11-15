@@ -12,8 +12,13 @@ eda/
 ├── README.md          this file
 ├── scripts/           ball_gaps.py, ball_outside.py, ball_stationary.py, check_channels.py,
 │                      common.py, gap_stoppage.py, sample_long_gaps.py, signal_profiles.py,
-│                      speed_units.py, tag_gaps.py
-├── notebooks/         the four eda_*.ipynb + plot_helpers.py
+│                      speed_units.py, tag_gaps.py; possession: poss_common.py,
+│                      poss_reference.py, poss_ball_live.py, poss_carries.py,
+│                      poss_pass_chains.py, poss_shape.py, poss_ball_field.py,
+│                      poss_reversal.py, poss_contested.py, poss_restarts.py,
+│                      poss_durations.py
+├── notebooks/         the four eda_*.ipynb + plot_helpers.py; eda_possession.py (the
+│                      possession notebook as a jupytext percent-format source)
 ├── reports/           the eda_*.pdf and eda_*.docx renders
 ├── docs/analyses.md   definitions and reading notes per analysis
 ├── deadball_matching/ dead-ball intervals (missing + outside + still) matched one-to-one against
@@ -37,6 +42,17 @@ The scripts import each other as siblings (`import ball_gaps`), so keep them tog
 | `signal_profiles.py` | generalises `tag_gaps.py` view A to six per-frame signals (ball missing, ball outside, ball still, share of slow players, homography reprojection error, tracked slots), profiled around set-piece starts (and ends) per `Type` with a circular-shift null | `signal_profiles_summary.csv` |
 | `gap_stoppage.py` | clause d: per ball-missing gap, mean slow-player share, reprojection error and tracked slots; only medians and quartiles per gap-length bin, plus optional k-means sizes and centres | `gap_stoppage_summary.csv` |
 | `tag_gaps.py` | lines gaps up with every Smart Tagging code and set-piece `Type`: (A) P(ball missing) per 1 s bin around each tag's start and end, (B) per gap-length band, how often gaps overlap a code or end within 5 s of its start, (C) for "gap >= L", proxy precision / recall against SET PIECES starts and the share of frames covered; A and B against a circular-shift null; needs `ball_gaps.py` next to it | `tag_gaps_summary.csv` |
+| `poss_common.py` | shared preparation for the `poss_*.py` scripts (no output of its own): tracking in metres, slot teams, attacking direction, live mask (graded minus the dead frames of `dead_ball.csv`), ball interpolation, Smart Tagging pseudo-labels with agreement per code, the `--degrade` copy | |
+| `poss_reference.py` | reference labels from Metrica's open event data (Sample Game 3 only): dead frames and H / A per live frame, checked against the ball-blank frames of the open tracking; label counts, possessions, dead runs | `poss_reference_summary.csv` |
+| `poss_carries.py` | carries (ball within 1.5 m of one player, moving with them, for 0.5 s or more): durations, share of live time, precision of "carry team = possessing team", AUC per smoothing window, timing of carry-team switches against possession changes, carries on fast balls | `poss_carries_summary.csv` |
+| `poss_pass_chains.py` | passes (ball leaves one player and moves with a teammate, faster than 5 m/s in between) and chains of consecutive passes by one team: passes per team, chain lengths, live time covered, precision of "a chain of >= 2 passes by T => T has the ball" per chain length, AUC per window, timing of chain-team switches | `poss_pass_chains_summary.csv` |
+| `poss_shape.py` | team shape per frame (width, length, hull area, centroid advance and velocity, defensive-line depth, players goal-side of the ball): possessing minus defending, AUC per window split by ball present / missing, each team's line depth when defending and attacking | `poss_shape_summary.csv` |
+| `poss_ball_field.py` | three scores for "home has the ball": ball position (which half), ball direction (sign of its x velocity), both teams' centroids drifting the same way; AUC per window, and per team the share of frames it has the ball by the ball's third of the pitch | `poss_ball_field_summary.csv` |
+| `poss_reversal.py` | joint reversals (both teams' direction flips within 1 s): rate against a circular-shift null, timing against possession changes, change-detection and implied-state AUC per window, each team's velocity in 1 s bins over +-10 s around changes against shifted anchors | `poss_reversal_summary.csv` |
+| `poss_contested.py` | nearest team to the ball (the organisers' baseline signal) and its flips: AUC per window, flip rate and contested share around possession changes, around loose balls that changed nothing (reference game) and mid-possession, and whether flip density separates turnovers from either | `poss_contested_summary.csv` |
+| `poss_restarts.py` | the team restarting after each dead ball, by five rules (player beyond a touchline or nearest the ball; opposite of the last team near the ball; opposite of the last label; Smart Tagging set-piece team; first label after): accuracy per rule on the reference game, pairwise agreement matrix (no per-restart rows) | `poss_restarts_summary.csv` |
+| `poss_durations.py` | reference game only: live possession lengths (quantiles, bins, per team), how they end (turnover, dead ball, half end), a log-normal fit and a discrete hazard per length bin, the duration prior for a semi-Markov model | `poss_durations_summary.csv` |
+| `poss_ball_live.py` | ball availability on live frames: observed / interpolated / missing shares, gaps per length bin before and after interpolation, gap-length quantiles, other interpolation caps, missing share on dead frames and within 2 s of possession changes | `poss_ball_live_summary.csv` |
 
 Needs Python 3.8+ and numpy. `games.py` comes via `PYTHONPATH` (the team repo root has a copy). Match
 files come from `games.asset_paths()`, which honours `MTAH_DATA_DIR`. The output folder is
@@ -194,6 +210,86 @@ cd ~/more-than-a-hack && PYTHONPATH="$PWD" python3 eda/scripts/gap_stoppage.py "
 cd ~/more-than-a-hack && PYTHONPATH="$PWD" python3 eda/scripts/gap_stoppage.py "$HOME/eda_out/gap_stoppage_walk15" --walk-ms 1.5 --clusters 2
 ```
 
+### Possession signals (read by `eda_possession.ipynb`)
+
+The `poss_*.py` scripts run on live frames, so they need the dead frames from the dead-ball
+model first. It writes a frame-indexed `dead_ball.csv` outside the repository (it needs pandas,
+through `src/deadball/train_players.py`):
+
+```bash
+cd ~/more-than-a-hack && PYTHONPATH="$PWD:$PWD/src" python3 -m deadball.run "$HOME/eda_out/dead_ball"
+```
+
+Ball availability on live play (`poss_ball_live.py`), with the Smart Tagging pseudo-labels for
+the change rows:
+
+```bash
+cd ~/more-than-a-hack && PYTHONPATH="$PWD" python3 eda/scripts/poss_ball_live.py "$HOME/eda_out/poss_ball_live" --dead "$HOME/eda_out/dead_ball/dead_ball.csv"
+```
+
+Carries (`poss_carries.py`):
+
+```bash
+cd ~/more-than-a-hack && PYTHONPATH="$PWD" python3 eda/scripts/poss_carries.py "$HOME/eda_out/poss_carries" --dead "$HOME/eda_out/dead_ball/dead_ball.csv"
+```
+
+Pass chains (`poss_pass_chains.py`):
+
+```bash
+cd ~/more-than-a-hack && PYTHONPATH="$PWD" python3 eda/scripts/poss_pass_chains.py "$HOME/eda_out/poss_pass_chains" --dead "$HOME/eda_out/dead_ball/dead_ball.csv"
+```
+
+Team shape (`poss_shape.py`):
+
+```bash
+cd ~/more-than-a-hack && PYTHONPATH="$PWD" python3 eda/scripts/poss_shape.py "$HOME/eda_out/poss_shape" --dead "$HOME/eda_out/dead_ball/dead_ball.csv"
+```
+
+Ball position vs direction (`poss_ball_field.py`):
+
+```bash
+cd ~/more-than-a-hack && PYTHONPATH="$PWD" python3 eda/scripts/poss_ball_field.py "$HOME/eda_out/poss_ball_field" --dead "$HOME/eda_out/dead_ball/dead_ball.csv"
+```
+
+Joint reversals (`poss_reversal.py`):
+
+```bash
+cd ~/more-than-a-hack && PYTHONPATH="$PWD" python3 eda/scripts/poss_reversal.py "$HOME/eda_out/poss_reversal" --dead "$HOME/eda_out/dead_ball/dead_ball.csv"
+```
+
+Contested ball (`poss_contested.py`):
+
+```bash
+cd ~/more-than-a-hack && PYTHONPATH="$PWD" python3 eda/scripts/poss_contested.py "$HOME/eda_out/poss_contested" --dead "$HOME/eda_out/dead_ball/dead_ball.csv"
+```
+
+Restarts (`poss_restarts.py`):
+
+```bash
+cd ~/more-than-a-hack && PYTHONPATH="$PWD" python3 eda/scripts/poss_restarts.py "$HOME/eda_out/poss_restarts" --dead "$HOME/eda_out/dead_ball/dead_ball.csv"
+```
+
+The Sample Game 3 runs (clean and `--degrade`) go to `$HOME/eda_out/poss_*_sg3` and
+`$HOME/eda_out/poss_*_sg3_deg`, so the notebook finds them next to the match run; their commands
+are under "Run on Metrica Sample Game 3" below.
+
+### Possession notebook (`eda_possession.py`)
+
+The possession notebook is kept as a percent-format source (`# %%` cells, `# %% [markdown]`
+text), which Jupyter opens through jupytext and which also runs as a plain script. It reads the
+`poss_*` folders under `EDA_OUT` (default `~/eda_out`): `poss_<x>` (match), `poss_<x>_sg3` and
+`poss_<x>_sg3_deg` (Sample Game 3 clean and degraded) and `poss_durations_sg3`; missing runs
+are skipped with a note. Section 0 is the summary table (verdicts from the editable criteria in
+the first code cell) and the two scale-map heatmaps; sections 1-9 follow the scripts. To get an
+`.ipynb` without outputs, from `eda/notebooks/` (needs `pip install jupytext`):
+
+```bash
+jupytext --to ipynb eda_possession.py
+```
+
+Run it from `eda/notebooks/` (or set `EDA_DIR`) after the `poss_*` runs. As for the other
+notebooks, clear outputs before a copy leaves the VM.
+
 ### Notebook (`eda_ball_missing.ipynb`)
 
 The notebook lists the ball-missing run commands above as comments, including the five
@@ -345,6 +441,115 @@ must be a multiple of it), `--link-window` (B, C: s, default 5), `--tag-toleranc
 s, default 0), `--thresholds` (C: comma-separated s, default
 `0,0.5,1,2,3,5,7,10,15,20,30,45,60`), `--null-n` (default 1000; 0 = off), `--null-seed`
 (default 0), `--null-min-shift` (s, default 60).
+
+## Possession scripts on Sample Game 3
+
+Each `poss_*.py` script runs on the reference game twice: clean and with `--degrade`. `--events`
+gives the true labels and the dead frames. Run from the team-repo root, with `SG3` set to your
+copy of Metrica's open `sample-data/data/Sample_Game_3` folder (or the folder holding the three
+files):
+
+```bash
+cd ~/more-than-a-hack && SG3=/path/to/Sample_Game_3 && python3 eda/scripts/poss_reference.py "$HOME/eda_out/poss_reference_sg3" --raw "$SG3/Sample_Game_3_tracking.txt" --meta "$SG3/Sample_Game_3_metadata.xml" --events "$SG3/Sample_Game_3_events.json" --frames 0-69660,69661-143760 --pitch 105 68
+```
+
+```bash
+cd ~/more-than-a-hack && SG3=/path/to/Sample_Game_3 && python3 eda/scripts/poss_ball_live.py "$HOME/eda_out/poss_ball_live_sg3" --raw "$SG3/Sample_Game_3_tracking.txt" --meta "$SG3/Sample_Game_3_metadata.xml" --events "$SG3/Sample_Game_3_events.json" --frames 0-69660,69661-143760 --pitch 105 68
+```
+
+```bash
+cd ~/more-than-a-hack && SG3=/path/to/Sample_Game_3 && python3 eda/scripts/poss_ball_live.py "$HOME/eda_out/poss_ball_live_sg3_deg" --raw "$SG3/Sample_Game_3_tracking.txt" --meta "$SG3/Sample_Game_3_metadata.xml" --events "$SG3/Sample_Game_3_events.json" --frames 0-69660,69661-143760 --pitch 105 68 --degrade
+```
+
+```bash
+cd ~/more-than-a-hack && SG3=/path/to/Sample_Game_3 && python3 eda/scripts/poss_carries.py "$HOME/eda_out/poss_carries_sg3" --raw "$SG3/Sample_Game_3_tracking.txt" --meta "$SG3/Sample_Game_3_metadata.xml" --events "$SG3/Sample_Game_3_events.json" --frames 0-69660,69661-143760 --pitch 105 68
+```
+
+```bash
+cd ~/more-than-a-hack && SG3=/path/to/Sample_Game_3 && python3 eda/scripts/poss_carries.py "$HOME/eda_out/poss_carries_sg3_deg" --raw "$SG3/Sample_Game_3_tracking.txt" --meta "$SG3/Sample_Game_3_metadata.xml" --events "$SG3/Sample_Game_3_events.json" --frames 0-69660,69661-143760 --pitch 105 68 --degrade
+```
+
+```bash
+cd ~/more-than-a-hack && SG3=/path/to/Sample_Game_3 && python3 eda/scripts/poss_pass_chains.py "$HOME/eda_out/poss_pass_chains_sg3" --raw "$SG3/Sample_Game_3_tracking.txt" --meta "$SG3/Sample_Game_3_metadata.xml" --events "$SG3/Sample_Game_3_events.json" --frames 0-69660,69661-143760 --pitch 105 68
+```
+
+```bash
+cd ~/more-than-a-hack && SG3=/path/to/Sample_Game_3 && python3 eda/scripts/poss_pass_chains.py "$HOME/eda_out/poss_pass_chains_sg3_deg" --raw "$SG3/Sample_Game_3_tracking.txt" --meta "$SG3/Sample_Game_3_metadata.xml" --events "$SG3/Sample_Game_3_events.json" --frames 0-69660,69661-143760 --pitch 105 68 --degrade
+```
+
+```bash
+cd ~/more-than-a-hack && SG3=/path/to/Sample_Game_3 && python3 eda/scripts/poss_shape.py "$HOME/eda_out/poss_shape_sg3" --raw "$SG3/Sample_Game_3_tracking.txt" --meta "$SG3/Sample_Game_3_metadata.xml" --events "$SG3/Sample_Game_3_events.json" --frames 0-69660,69661-143760 --pitch 105 68
+```
+
+```bash
+cd ~/more-than-a-hack && SG3=/path/to/Sample_Game_3 && python3 eda/scripts/poss_shape.py "$HOME/eda_out/poss_shape_sg3_deg" --raw "$SG3/Sample_Game_3_tracking.txt" --meta "$SG3/Sample_Game_3_metadata.xml" --events "$SG3/Sample_Game_3_events.json" --frames 0-69660,69661-143760 --pitch 105 68 --degrade
+```
+
+```bash
+cd ~/more-than-a-hack && SG3=/path/to/Sample_Game_3 && python3 eda/scripts/poss_ball_field.py "$HOME/eda_out/poss_ball_field_sg3" --raw "$SG3/Sample_Game_3_tracking.txt" --meta "$SG3/Sample_Game_3_metadata.xml" --events "$SG3/Sample_Game_3_events.json" --frames 0-69660,69661-143760 --pitch 105 68
+```
+
+```bash
+cd ~/more-than-a-hack && SG3=/path/to/Sample_Game_3 && python3 eda/scripts/poss_ball_field.py "$HOME/eda_out/poss_ball_field_sg3_deg" --raw "$SG3/Sample_Game_3_tracking.txt" --meta "$SG3/Sample_Game_3_metadata.xml" --events "$SG3/Sample_Game_3_events.json" --frames 0-69660,69661-143760 --pitch 105 68 --degrade
+```
+
+```bash
+cd ~/more-than-a-hack && SG3=/path/to/Sample_Game_3 && python3 eda/scripts/poss_reversal.py "$HOME/eda_out/poss_reversal_sg3" --raw "$SG3/Sample_Game_3_tracking.txt" --meta "$SG3/Sample_Game_3_metadata.xml" --events "$SG3/Sample_Game_3_events.json" --frames 0-69660,69661-143760 --pitch 105 68
+```
+
+```bash
+cd ~/more-than-a-hack && SG3=/path/to/Sample_Game_3 && python3 eda/scripts/poss_reversal.py "$HOME/eda_out/poss_reversal_sg3_deg" --raw "$SG3/Sample_Game_3_tracking.txt" --meta "$SG3/Sample_Game_3_metadata.xml" --events "$SG3/Sample_Game_3_events.json" --frames 0-69660,69661-143760 --pitch 105 68 --degrade
+```
+
+```bash
+cd ~/more-than-a-hack && SG3=/path/to/Sample_Game_3 && python3 eda/scripts/poss_contested.py "$HOME/eda_out/poss_contested_sg3" --raw "$SG3/Sample_Game_3_tracking.txt" --meta "$SG3/Sample_Game_3_metadata.xml" --events "$SG3/Sample_Game_3_events.json" --frames 0-69660,69661-143760 --pitch 105 68
+```
+
+```bash
+cd ~/more-than-a-hack && SG3=/path/to/Sample_Game_3 && python3 eda/scripts/poss_contested.py "$HOME/eda_out/poss_contested_sg3_deg" --raw "$SG3/Sample_Game_3_tracking.txt" --meta "$SG3/Sample_Game_3_metadata.xml" --events "$SG3/Sample_Game_3_events.json" --frames 0-69660,69661-143760 --pitch 105 68 --degrade
+```
+
+```bash
+cd ~/more-than-a-hack && SG3=/path/to/Sample_Game_3 && python3 eda/scripts/poss_restarts.py "$HOME/eda_out/poss_restarts_sg3" --raw "$SG3/Sample_Game_3_tracking.txt" --meta "$SG3/Sample_Game_3_metadata.xml" --events "$SG3/Sample_Game_3_events.json" --frames 0-69660,69661-143760 --pitch 105 68
+```
+
+```bash
+cd ~/more-than-a-hack && SG3=/path/to/Sample_Game_3 && python3 eda/scripts/poss_restarts.py "$HOME/eda_out/poss_restarts_sg3_deg" --raw "$SG3/Sample_Game_3_tracking.txt" --meta "$SG3/Sample_Game_3_metadata.xml" --events "$SG3/Sample_Game_3_events.json" --frames 0-69660,69661-143760 --pitch 105 68 --degrade
+```
+
+`poss_durations.py` needs true labels, so it runs on the reference game only (once: the degraded
+copy does not change the labels):
+
+```bash
+cd ~/more-than-a-hack && SG3=/path/to/Sample_Game_3 && python3 eda/scripts/poss_durations.py "$HOME/eda_out/poss_durations_sg3" --raw "$SG3/Sample_Game_3_tracking.txt" --meta "$SG3/Sample_Game_3_metadata.xml" --events "$SG3/Sample_Game_3_events.json" --frames 0-69660,69661-143760 --pitch 105 68
+```
+
+## Options (all `poss_*.py` scripts)
+
+`--raw`, `--meta` (required with `--raw`), `--tags` (pseudo-labels; default the match's Smart
+Tagging without `--raw`), `--events` (reference game only: true labels and dead frames),
+`--dead` (`dead_ball.csv`; required unless `--events`; overrides the dead frames of
+`--events`), `--frames`, `--game`, `--fps`, `--pitch L W`, `--lag` (frames, default 5),
+`--max-interp-frames` (default 12), `--tag-teams HOME,AWAY` (Smart Tagging team names, when the
+automatic match fails), `--degrade` with `--seed` (default 0), `--missing-share` (default 0.41),
+`--gap-lengths MEDIAN_S,SIGMA,CAP_S` (default `1,1.1,30`), `--frag-mean-s` (default 20),
+`--frag-gap-frames` (default 5), `--windows` (AUC smoothing windows, comma-separated s, default
+`0.5,1,2,5,10`; the frame itself is always added), `--timing-window-s` (default 5), and
+`--null-n`, `--null-seed`, `--null-min-shift` (as above).
+
+`poss_ball_live.py` also takes `--interp-also` (comma-separated frames, default `6,25`) and
+`--change-window-s` (default 2). `poss_carries.py` takes `--carry-dist-m` (default 1.5),
+`--carry-dv` (m/s, default 2), `--carry-min-s` (default 0.5) and `--fast-ball-ms` (default 15).
+`poss_pass_chains.py` takes `--carry-dist-m` and `--carry-dv` (the contact test),
+`--touch-min-s` (default 0.2), `--pass-min-ms` (default 5), `--pass-max-s` (default 5) and
+`--min-chain` (passes, default 2). `poss_shape.py` takes `--min-players` (outfield players,
+default 3). `poss_ball_field.py` takes `--min-ms` (slowest ball or team speed that counts as
+a direction, default 0.5). `poss_reversal.py` takes `--min-ms` (default 0.5),
+`--reversal-window-s` (default 1) and `--change-window-s` (default 1). `poss_contested.py`
+takes `--flip-window-s` (default 2), `--context-s` (default 1.5), `--loose-gap-s` (default 3)
+and `--mid-margin-s` (default 5). `poss_restarts.py` takes `--geom-look-s` (default 1),
+`--last-look-s` (default 3), `--tag-window-s` (default 5), `--look-after-s` (default 5) and
+`--touchline-m` (default 0.5).
 
 ## Tests (laptop only)
 
