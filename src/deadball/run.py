@@ -8,12 +8,14 @@ the repository) and prints aggregates only. Method, in the order it runs:
 
   1. Player evidence. The model fitted on the open sample games (train_players.py) turns how
      the 22 players are moving into a log-odds that the ball is dead. No ball needed.
-  2. Ball evidence. Each frame's ball track is one of 14 categories (signals.BALL_CATEGORIES).
+  2. Ball evidence. Each frame's ball track is one of 16 categories (signals.BALL_CATEGORIES).
      How likely each visible category is in dead vs live play is learned from this match with no
      labels, by EM on a two-state model anchored by the player evidence. A missing ball carries
      no evidence either way: gaps happen in live play too, so during a gap the players decide.
   3. Decode. Sticky Viterbi per half; tempering and switch cost come from the sample games.
-  4. The second half's graded block starts before its kickoff; everything before the kickoff
+  4. Sharpen. Dead-spell edges move to the ball reappearing (end) or leaving the pitch (start)
+     when one of those happens within SNAP_S of the decoded edge.
+  5. The second half's graded block starts before its kickoff; everything before the kickoff
      anchor in games.py is dead.
 """
 
@@ -21,6 +23,7 @@ import argparse
 import json
 import os
 import sys
+import xml.etree.ElementTree as ET
 
 import numpy as np
 
@@ -28,6 +31,7 @@ from deadball import hmm, signals, train_players
 import games
 
 EM_STEPS = 25
+SNAP_S = 3.0  # how far a dead-spell edge may move to meet a ball event; fixed, not searched
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
@@ -62,7 +66,63 @@ def ball_log_ratios(llr, category, blocks, temper, log_a):
     return log_ratio
 
 
-def label(game=games.GAME):
+def sharpen_edges(dead, category, counts):
+    """Move dead-spell edges to the ball events that mark them. Returns a new 0/1 array.
+
+    The decoder places edges from evidence averaged over seconds, so it is right about which
+    stoppages happened and vague about when. Two ball events are sharp:
+
+      end    The tracker picks the ball up again when it is put back into play. If the ball
+             reappears within SNAP_S of the decoded end, on either side, the spell ends there.
+      start  The ball crossing a line stops play at once, before anyone slows down. If the ball
+             goes outside the pitch within SNAP_S before the decoded start and is not seen back
+             inside in between, the spell starts at the first outside frame.
+
+    Spells are processed in time order and never moved past a neighbouring spell.
+    """
+    out = dead.copy()
+    missing = category == signals.MISSING
+    outside = category == signals.OUTSIDE
+    snap = int(SNAP_S * signals.FPS)
+    n = len(dead)
+    spells = hmm.spells(dead == hmm.DEAD)
+    for index, (start, stop) in enumerate(spells):
+        next_start = spells[index + 1][0] if index + 1 < len(spells) else n
+        prev_stop = spells[index - 1][1] if index else 0
+
+        new_stop = stop
+        if stop < n and missing[stop]:
+            # still missing at the decoded end: wait for the ball, but not for long
+            ahead = np.flatnonzero(~missing[stop:min(n, stop + snap + 1, next_start)])
+            if len(ahead):
+                new_stop = stop + int(ahead[0])
+                counts["end_extended"] += 1
+        else:
+            # the ball came back shortly before the decoded end and stayed
+            window = missing[max(start, stop - snap - 1):stop]
+            gone = np.flatnonzero(window)
+            if len(gone) and not window[-1]:
+                new_stop = max(start, stop - snap - 1) + int(gone[-1]) + 1
+                counts["end_trimmed"] += 1
+
+        new_start = start
+        low = max(prev_stop, start - snap)
+        before = category[low:start]
+        went_out = np.flatnonzero(outside[low:start])
+        if len(went_out):
+            first = int(went_out[0])
+            back_inside = (before[first:] != signals.OUTSIDE) & (before[first:] != signals.MISSING)
+            if not back_inside.any():
+                new_start = low + first
+                counts["start_moved"] += 1
+
+        counts["frames_moved"] += abs(new_stop - stop) + abs(new_start - start)
+        out[start:stop] = hmm.ALIVE
+        out[new_start:new_stop] = hmm.DEAD
+    return out
+
+
+def label(game=games.GAME, sharpen=True):
     with open(train_players.MODEL_PATH) as handle:
         model = json.load(handle)
     raw_path = games.require(["atd_raw"], game)[0]
@@ -79,13 +139,17 @@ def label(game=games.GAME):
     llr = llr_players + ball_ratio[category]
     dead = np.full(n_frames, -1, dtype=np.int8)
     p_dead = np.full(n_frames, np.nan)
+    edges = {"end_extended": 0, "end_trimmed": 0, "start_moved": 0, "frames_moved": 0}
     for start, stop, live in blocks:
         emission = np.column_stack([-llr[live:stop] / 2, llr[live:stop] / 2]) / model["temper"]
-        dead[live:stop] = hmm.viterbi(emission, log_a)
+        decoded = hmm.viterbi(emission, log_a)
+        if sharpen:
+            decoded = sharpen_edges(decoded, category[live:stop], edges)
+        dead[live:stop] = decoded
         p_dead[live:stop] = hmm.forward_backward(emission, log_a)[:, hmm.DEAD]
         dead[start:live], p_dead[start:live] = hmm.DEAD, 1.0
     return {"dead": dead, "p_dead": p_dead, "llr_dead": llr, "llr_players": llr_players,
-            "category": category, "ball_ratio": ball_ratio, "blocks": blocks}
+            "category": category, "ball_ratio": ball_ratio, "blocks": blocks, "edges": edges}
 
 
 def summarise(result):
@@ -101,9 +165,40 @@ def summarise(result):
         print("half {}: dead share {:.3f}, {} dead spells, length s p10/p50/p90 {}".format(
             half, np.mean(dead[start:stop] == hmm.DEAD), len(lengths),
             np.percentile(lengths, [10, 50, 90]).round(1).tolist()))
+    if "edges" in result:
+        print("edges sharpened: {end_extended} ends extended to the ball reappearing, {end_trimmed} "
+              "trimmed back to it, {start_moved} starts moved to the ball going out "
+              "({frames_moved} frames moved in total)".format(**result["edges"]))
     missing = graded & (category == signals.MISSING)
     print("ball-missing frames called dead: {:.3f}; ball-visible frames called dead: {:.3f}".format(
         np.mean(dead[missing] == hmm.DEAD), np.mean(dead[graded & ~missing] == hmm.DEAD)))
+
+
+def tag_check(result, game=games.GAME):
+    """Label-free check: is the ball called dead at the start of each tagged set piece?
+
+    Smart Tagging is automatic and its timing is loose, so this is evidence, not a score. Read
+    it against the chance line: a model that calls more of the match dead hits more tags for free.
+    """
+    path = games.asset_paths(game)["smart_tagging"]
+    if not os.path.isfile(path):
+        print("no Smart Tagging file: tag check skipped")
+        return
+    dead, fps = result["dead"], games.GAMES[game]["fps"]
+    hits = {}
+    for instance in ET.parse(path).iter("instance"):
+        if (instance.findtext("code") or "").strip().lower() != "set pieces":
+            continue
+        frame = int(round(float(instance.findtext("start")) * fps))
+        if frame >= len(dead) or dead[frame] < 0:
+            continue
+        kind = next((label.findtext("text") for label in instance.findall("label")
+                     if label.findtext("group") == "Type"), "(no Type)")
+        hits.setdefault(kind, []).append(dead[frame] == hmm.DEAD)
+    total = [hit for kind in hits for hit in hits[kind]]
+    print("dead at the start of tagged set pieces: {}/{} (chance {:.2f}); {}".format(
+        int(np.sum(total)), len(total), np.mean(dead[dead >= 0] == hmm.DEAD),
+        ", ".join("{} {}/{}".format(kind, int(np.sum(h)), len(h)) for kind, h in sorted(hits.items()))))
 
 
 def check(result, gt_path):
@@ -138,9 +233,11 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("out_dir", help="folder outside the repository")
     parser.add_argument("--check", metavar="PUBLIC_GT_CSV", help="print agreement on the public window")
+    parser.add_argument("--no-sharpen", action="store_true", help="keep the decoder's own edges")
     args = parser.parse_args()
-    result = label()
+    result = label(sharpen=not args.no_sharpen)
     summarise(result)
+    tag_check(result)
     if args.check:
         check(result, args.check)
     print("wrote", write_csv(result, args.out_dir))

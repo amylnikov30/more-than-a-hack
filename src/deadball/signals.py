@@ -20,8 +20,15 @@ OUT_MARGIN_M = 1.0        # ball this far beyond a line counts as outside
 BALL_SPEED_EDGES = (1.0, 4.0, 12.0)   # m/s
 BALL_DIST_EDGES = (2.0, 5.0)          # m to the nearest tracked player
 
-MISSING, OUTSIDE = 0, 1
-BALL_CATEGORIES = ["missing", "outside"] + [
+SLOW_BALL_MS = 4.0        # below this the ball is being placed, carried or rolled, not played
+GOAL_AREA_DEPTH_M = 5.5   # IFAB goal area: 5.5 m deep, 9.16 m either side of the goal centre
+GOAL_AREA_HALF_WIDTH_M = 9.16
+TOUCHLINE_BAND_M = 2.0    # throw-ins are taken on or just off the line
+MARK_TOLERANCE_M = 1.0    # about the tracking error
+
+MISSING, OUTSIDE, GOAL_AREA_SLOW, TOUCHLINE_SLOW = 0, 1, 2, 3
+N_PLACED = 4              # categories before the speed x distance grid
+BALL_CATEGORIES = ["missing", "outside", "slow in a goal area", "slow on a touchline"] + [
     "speed {} m/s, nearest player {} m".format(s, d)
     for s in ("<1", "1-4", "4-12", ">12") for d in ("<2", "2-5", ">5")]
 
@@ -91,7 +98,11 @@ def player_features(players, pitch):
 
 
 def ball_categories(players, ball, pitch):
-    """One of len(BALL_CATEGORIES) discrete states of the ball track per frame."""
+    """One of len(BALL_CATEGORIES) discrete states of the ball track per frame.
+
+    Missing; outside the pitch; slow in a goal area or on a touchline; otherwise a speed band
+    crossed with the distance to the nearest tracked player.
+    """
     pitch = np.asarray(pitch, dtype=float)
     xy = ball * pitch
     visible = ~np.isnan(ball[:, 0])
@@ -112,5 +123,15 @@ def ball_categories(players, ball, pitch):
     outside = visible & (inside_by < -OUT_MARGIN_M)
     category[outside] = OUTSIDE
     inside = visible & ~outside
-    category[inside] = 2 + speed_bin[inside] * (len(BALL_DIST_EDGES) + 1) + dist_bin[inside]
+    category[inside] = N_PLACED + speed_bin[inside] * (len(BALL_DIST_EDGES) + 1) + dist_bin[inside]
+
+    # Where a slow ball sits matters for two restarts the players give little warning of: goal
+    # kicks (ball visible, few players slow down) and throw-ins (players slow down late).
+    slow = inside & (np.where(np.isnan(speed), 5.0, speed) < SLOW_BALL_MS)
+    goal_depth = np.minimum(xy[:, 0], pitch[0] - xy[:, 0])
+    touch_depth = np.minimum(xy[:, 1], pitch[1] - xy[:, 1])
+    in_goal_area = ((goal_depth <= GOAL_AREA_DEPTH_M + MARK_TOLERANCE_M)
+                    & (np.abs(xy[:, 1] - pitch[1] / 2) <= GOAL_AREA_HALF_WIDTH_M + MARK_TOLERANCE_M))
+    category[slow & (touch_depth <= TOUCHLINE_BAND_M)] = TOUCHLINE_SLOW
+    category[slow & in_goal_area] = GOAL_AREA_SLOW
     return category

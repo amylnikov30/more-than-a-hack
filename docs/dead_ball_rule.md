@@ -34,7 +34,7 @@ ratio 0.99); the declared ball speed is blank on 92% of visible frames and unusa
    log-odds of dead ball. It needs no ball, so it works on all 41% of frames where the ball is
    missing.
 2. **Ball evidence** (`signals.ball_categories`, `run.ball_log_ratios`). Each frame's ball is
-   one of 14 categories: missing, outside, or visible inside in one of 4 speed bands × 3
+   one of 16 categories: missing, outside, slow in a goal area, slow on a touchline, or visible inside in one of 4 speed bands × 3
    distance-to-nearest-player bands. How much each visible category favours dead or live is
    learned on the match itself **without labels**: EM on a two-state model whose meaning is
    pinned by the player evidence.
@@ -131,3 +131,72 @@ Runtime is under a minute. Dependencies: numpy and pandas (`requirements.txt`).
    and its start to the last fast ball frame before the players slow.
 2. Check the dead share against the sample games after step 1.
 3. Feed `llr_dead` into the three-state HMM (option 2) once the H/A emissions exist.
+
+## Update, 13 Nov: restart-type cues and edge sharpening
+
+Rob's signal profiles around tagged set pieces show where the first version is weakest:
+
+| Restart (tags) | Ball missing around it | Players under 2 m/s | Reading |
+|---|---|---|---|
+| Corner (12) | 100% from −6 s to +2 s | 96% | easy |
+| Free kick (5) | 80–100% | 93–97% | easy |
+| Kick-off after goal (4) | 100%, reappears 2–3 s after the tag | 93–100% | easy; end at the ball reappearing |
+| Throw-in (26) | 60–70% | rises to 85–91% only after the tag | hard: players slow late; visible ball is outside 30–60% of the time |
+| Goal kick (10) | 20–50% | 77% | hardest: ball visible, players barely slow |
+
+Three changes follow from that. All constants are fixed in advance from the laws of the game
+or the tracking error; none was searched.
+
+1. **Two new ball categories**: a slow ball (< 4 m/s) in a goal area, and a slow ball within
+   2 m of a touchline. EM learned +2.35 and +2.00 log-odds toward dead for them, against +0.1 for
+   a slow ball at a player's feet elsewhere. This is clause c's location idea, kept only where
+   the EDA showed a restart link (goal area lift 4.5, touchline band 3.4).
+2. **End at the ball reappearing** (`run.sharpen_edges`). If the ball comes back within 3 s of a
+   decoded dead-spell end, on either side, the spell ends at that frame. Applied to 36 of 113
+   spells (28 extended, 8 trimmed).
+3. **Start at the ball going out.** If the ball leaves the pitch within 3 s before a decoded
+   start and is not seen back inside, the spell starts at the first outside frame. Applied once.
+
+**Effect: small.** 1,105 frames moved in total (about 1.2 s per affected spell); 113 dead spells
+instead of 114; dead share unchanged at about 51%. The public-window pipeline check is the same
+to two decimals (dead F1 0.85, 4 spells of 4). `--no-sharpen` switches change 2 and 3 off.
+
+**What this tells us.** The large edge errors are not at ball gaps. They are in stoppages where
+the ball stays visible, where the only timing signal is the player features, and those are
+averaged over up to 12 s. The next gain is there: a player model with shorter windows for the
+edges, or a restart detector based on the ball's first fast movement after a slow spell.
+Kick-off formation (every player in their own half) is still to do and can be scored on the
+sample games.
+
+## Experiments that did not make it in (13 Nov)
+
+Four attempts to push the model further, each scored on held-out sample games with the
+spellF1 matching on ball-in-play spells. The shipped player model scores 0.633 there.
+
+| Attempt | Held-out sample games | On the match | Decision |
+|---|---|---|---|
+| 150 player features (more windows, standing, sprinting, flow, spread, acceleration), logistic | 0.656 | not run | not kept |
+| Same features, small neural network | 0.665 | — | not kept |
+| + positional restart cues (player on a touchline, near a corner) | 0.671 | dead at 42 of 58 tagged set-piece starts (shipped: 51) | not kept |
+| + learned edge refinement (short-window model moves each edge up to 4 s) | 0.688 | 46 of 58; public check finds 3 stoppages of 4 (shipped: 4) | not kept |
+
+The gain on the sample games is real but small (+0.055, most of it from one game), and it does
+not carry over to the automatic tracking of the match. A model fitted to clean, corrected
+tracking with 186 features is more fragile than one with 18. The simpler model stays.
+
+What the error analysis on the sample games shows: stoppages of 10 s or more are found 94% of
+the time; stoppages under 6 s only 30%. Those short ones are quick throw-ins and free kicks
+where the players never slow down, so no player-only model can see them. On the match the ball
+evidence covers them: the ball is called dead at the start of 23 of 26 tagged throw-ins.
+
+Two label-free checks added while doing this:
+
+- **Tagged restarts** (`run.tag_check`, printed on every run): the ball is called dead at the
+  start of 51 of 58 tagged set pieces, against a chance level of 0.51. Misses: 3 goal kicks,
+  3 throw-ins, 1 corner.
+- **Goals**: in all four goal-to-kick-off stretches the model stays dead through the whole
+  celebration; the only live spell inside each goal tag is the attack that led to the goal.
+
+On the dead share: 51% is above the 37–41% of the sample games, but those are different matches
+and leagues. Without the full ground truth there is no evidence it is wrong, and both checks
+above are consistent with it.
