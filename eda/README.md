@@ -16,6 +16,10 @@ eda/
 ├── notebooks/         the four eda_*.ipynb + plot_helpers.py
 ├── reports/           the eda_*.pdf and eda_*.docx renders
 ├── docs/analyses.md   definitions and reading notes per analysis
+├── deadball_matching/ dead-ball intervals (missing + outside + still) matched one-to-one against
+│                      Smart Tagging set-piece starts, plus a video-review sample; own README
+├── touch_possession/  touches (velocity changes) -> attribution -> control rule for possession,
+│                      four measurements, a Sample Game 3 validation and a summary notebook; own README
 └── tests/             synthetic fixtures and the test suite
 ```
 
