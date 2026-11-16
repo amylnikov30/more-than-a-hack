@@ -33,7 +33,7 @@ def load_track(raw, meta, n, pitch):
 
 
 def label(track, dead, blocks, meta, pitch, model, tag_list=(), do_snap=config.SNAP,
-          fps=config.FPS, X=None, info=None):
+          fps=config.FPS, X=None, info=None, tag_stats=None):
     """Everything run.py computes, as a dict (team, labels, llr, priors, counts, ...).
 
     X / info: precomputed features.build output (train.py reuses them across settings)."""
@@ -43,7 +43,8 @@ def label(track, dead, blocks, meta, pitch, model, tag_list=(), do_snap=config.S
         X, _, info = features.build(track, blocks, live, meta, pitch, fps)
     llr = evidence.log_odds(model, X)
     llr[~live] = 0.0
-    priors, prior_counts = restart.priors(sp, info["signals"], tag_list, fps)
+    priors, prior_counts, tag_offsets = restart.priors(sp, info["signals"], tag_list, blocks,
+                                                       fps)
     m = int(round(model["min_seg_s"] * fps))
     team = decode.decode_all(llr, sp, model["lambda"], m, model["beta"], priors,
                              int(round(config.MIN_SPELL_S * fps)))
@@ -53,6 +54,7 @@ def label(track, dead, blocks, meta, pitch, model, tag_list=(), do_snap=config.S
         team, snap_counts = snap.snap(team, sp, control, fps)
     return {"team": team, "labels": spells.labels_from(dead, team), "llr": llr, "live": live,
             "spells": sp, "priors": priors, "prior_counts": prior_counts,
+            "tag_offsets": tag_offsets, "tag_stats": tag_stats,
             "snap_counts": snap_counts, "info": info}
 
 
@@ -67,8 +69,17 @@ def summarise(res, dead, fps=config.FPS):
     print("attacking direction: from {}; centroid inference agrees on {} of (team, half)".format(
         info["dir_source"], "n/a" if info["dir_agree"] != info["dir_agree"]
         else "{:.2f}".format(info["dir_agree"])))
+    ts = res["tag_stats"]
+    if ts is not None:
+        print("set-piece tags: {} in the file, {} with a mapped team; team map {}; unmapped "
+              "names {}".format(ts["set_pieces"], ts["mapped"], ts["team_map"] or "none",
+                                ts["unmapped"] or "none"))
     print("restart prior: {tag} from tags, {fast_ball} from the first fast ball, {none} none"
           .format(**res["prior_counts"]))
+    if res["tag_offsets"]:
+        print("linked tag start -> spell start, s: p10/p50/p90 {}, max {:.1f}".format(
+            np.percentile(res["tag_offsets"], [10, 50, 90]).round(1).tolist(),
+            max(res["tag_offsets"])))
     llr = res["llr"][live]
     print("evidence: mean |l| {:.2f}, at the clip {:.3f}, l > 0 on {:.3f} of live frames".format(
         float(np.mean(np.abs(llr))) if n_live else 0.0,
@@ -113,6 +124,8 @@ def main(argv=None):
                    help="graded video frames, one inclusive range per half (required with --raw)")
     p.add_argument("--pitch", type=float, nargs=2, metavar=("LENGTH", "WIDTH"),
                    help="metres; default games.GAMES[GAME]['pitch'] (required with --raw)")
+    p.add_argument("--tag-teams", help="'HOME,AWAY' Smart Tagging team names, when the "
+                   "automatic match to the metadata team names fails")
     p.add_argument("--model", default=evidence.MODEL_PATH, help="default possession/ha_model.json")
     p.add_argument("--snap", choices=("config", "on", "off"), default="config",
                    help="switch snapping; default config.SNAP ({})".format(config.SNAP))
@@ -139,10 +152,12 @@ def main(argv=None):
 
     dead = spells.apply_kickoffs(spells.read_dead(args.dead, n), blocks, kickoffs)
     model = evidence.load(args.model)
-    tag_list = restart.tag_restarts(tags, [t[1] for t in pc.read_teams(meta)]) if tags else []
+    tag_list, tag_stats = restart.tag_restarts(tags, [t[1] for t in pc.read_teams(meta)],
+                                               args.tag_teams)
     track = load_track(raw, meta, n, pitch)
     do_snap = config.SNAP if args.snap == "config" else args.snap == "on"
-    res = label(track, dead, blocks, meta, pitch, model, tag_list, do_snap)
+    res = label(track, dead, blocks, meta, pitch, model, tag_list, do_snap,
+                tag_stats=tag_stats if tags else None)
     summarise(res, dead)
     path = os.path.join(out_dir, "possession.csv")
     spells.write_labels(path, res["labels"])

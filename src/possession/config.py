@@ -15,7 +15,7 @@ PITCH = (105.3, 68.0)            # metres, BAR-ATH (games.py); the sample games 
 MIN_SPELL_S = 2.0                # norm: shorter live spells get one team, no switch
 
 # ---------------------------------------------------------------- restart prior (§4.1)
-TAG_LINK_S = 3.0                 # Smart Tagging timing looseness
+TAG_LINK_S = 3.0                 # Smart Tagging timing looseness: slack around the stoppage window
 ONSET_S = 3.0                    # norm: a restart is played within 3 s of the ball going live
 FAST_BALL_MS = 4.0               # m/s; the dead-ball model's slow / played boundary
 PRE_KICK_FRAMES = 5              # = LAG: the kick happened inside the speed lag before the fast frame

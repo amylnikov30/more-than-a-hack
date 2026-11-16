@@ -77,8 +77,15 @@ A test checks it against brute force. Spells shorter than 2 s get a single team.
 
 **Restart prior** (`prior ∈ {+1, −1, 0}`):
 
-1. A Smart Tagging `SET PIECES` tag that starts within 3 s of the spell start and has a known
-   team gives that team. A `Type` starting with "Defending" gives the other team.
+1. A Smart Tagging `SET PIECES` tag with a known team gives that team. A `Type` starting with
+   "Defending" gives the other team. The tag is linked to the spell it restarts when it starts
+   inside the stoppage before that spell, or at most 3 s into it. Precisely, the window is
+   [end of the previous live spell − 3 s, spell start + 3 s]; for a half's first spell it opens
+   at the half's first frame. The latest such tag wins.
+   **Deviation from the spec**, which linked only tags starting within ±3 s of the spell start.
+   On the match, set-piece tags start when the stoppage starts, often well before the ball is
+   played again, and that rule linked 3 of 112 spells. The new rule cannot be checked against
+   labels: the sample games have no Smart Tagging.
 2. Otherwise, take the first frame in the spell's first 3 s where the ball is faster than 4 m/s.
    The prior is the team of the nearest player over the 5 frames before it (majority vote).
 3. Otherwise, no prior.
@@ -103,7 +110,7 @@ games have no Smart Tagging, so the reference set exercises rule 2 only.
 | Constant | Value | Origin |
 |---|---|---|
 | `MIN_SPELL_S` | 2 s | football norm |
-| `TAG_LINK_S` | 3 s | Smart Tagging timing looseness |
+| `TAG_LINK_S` | 3 s | Smart Tagging timing looseness (slack on both ends of the stoppage window) |
 | `ONSET_S` | 3 s | football norm |
 | `FAST_BALL_MS` | 4 m/s | the dead-ball model's slow/played boundary |
 | `PRE_KICK_FRAMES` | 5 | equals the 0.2 s speed lag |
