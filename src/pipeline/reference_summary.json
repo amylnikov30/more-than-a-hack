@@ -1,0 +1,182 @@
+{
+ "bootstrap_n": 1000,
+ "decision": "model",
+ "games": {
+  "3": {
+   "aggregates": {
+    "baseline_smooth50": {
+     "dead_share": 0.33,
+     "graded_frames": 143761,
+     "h_share_of_live": 0.539,
+     "live_spells": 199,
+     "possession_s_p10_p50_p90": [
+      0.3,
+      3.2,
+      13.9
+     ],
+     "possessions": 719,
+     "possessions_per_live_minute": 11.2
+    },
+    "model": {
+     "dead_share": 0.316,
+     "graded_frames": 143761,
+     "h_share_of_live": 0.528,
+     "live_spells": 71,
+     "possession_s_p10_p50_p90": [
+      3.0,
+      12.5,
+      38.8
+     ],
+     "possessions": 223,
+     "possessions_per_live_minute": 3.4
+    },
+    "reference labels": {
+     "dead_share": 0.335,
+     "graded_frames": 143761,
+     "h_share_of_live": 0.517,
+     "live_spells": 102,
+     "possession_s_p10_p50_p90": [
+      0.6,
+      5.1,
+      27.9
+     ],
+     "possessions": 382,
+     "possessions_per_live_minute": 5.99
+    },
+    "rule": {
+     "dead_share": 0.316,
+     "graded_frames": 143761,
+     "h_share_of_live": 0.553,
+     "live_spells": 71,
+     "possession_s_p10_p50_p90": [
+      2.1,
+      13.0,
+      44.9
+     ],
+     "possessions": 208,
+     "possessions_per_live_minute": 3.17
+    }
+   },
+   "dead_ball": {
+    "alive_spell_f1": 0.627,
+    "dead_f1": 0.869,
+    "dead_share_labeller": 0.316,
+    "dead_share_reference": 0.335,
+    "dead_spells_labeller": 72,
+    "dead_spells_reference": 103
+   },
+   "rule_k": {
+    "held_out": {
+     "1": 12,
+     "2": 12
+    },
+    "to_ship": 12
+   },
+   "scores": {
+    "baseline_smooth50": {
+     "alive_dead_f1": 0.8796,
+     "fragmentation": 1.8948,
+     "macro_f1": 0.754,
+     "n_gt_spells": 382,
+     "n_pred_spells": 719,
+     "spell_bootstrap_high": 0.2779,
+     "spell_bootstrap_low": 0.2321,
+     "spell_f1_mean": 0.2547,
+     "team_acc_gt_alive": 0.7548,
+     "trans_precision_12": 0.0632,
+     "trans_precision_25": 0.1035,
+     "trans_recall_12": 0.1198,
+     "trans_recall_25": 0.1963
+    },
+    "model": {
+     "alive_dead_f1": 0.9369,
+     "fragmentation": 0.6082,
+     "macro_f1": 0.8506,
+     "n_gt_spells": 382,
+     "n_pred_spells": 223,
+     "spell_bootstrap_high": 0.5402,
+     "spell_bootstrap_low": 0.4483,
+     "spell_f1_mean": 0.4912,
+     "team_acc_gt_alive": 0.8534,
+     "trans_precision_12": 0.2857,
+     "trans_precision_25": 0.4286,
+     "trans_recall_12": 0.1736,
+     "trans_recall_25": 0.2603
+    },
+    "model_in_sample": {
+     "alive_dead_f1": 0.9369,
+     "fragmentation": 0.6041,
+     "macro_f1": 0.8523,
+     "n_gt_spells": 382,
+     "n_pred_spells": 221,
+     "spell_bootstrap_high": 0.5446,
+     "spell_bootstrap_low": 0.4504,
+     "spell_f1_mean": 0.4942,
+     "team_acc_gt_alive": 0.856,
+     "trans_precision_12": 0.2945,
+     "trans_precision_25": 0.4589,
+     "trans_recall_12": 0.1777,
+     "trans_recall_25": 0.2769
+    },
+    "model_oracle_mask": {
+     "alive_dead_f1": 1.0,
+     "fragmentation": 0.6866,
+     "macro_f1": 0.9331,
+     "n_gt_spells": 382,
+     "n_pred_spells": 230,
+     "spell_bootstrap_high": 0.6627,
+     "spell_bootstrap_low": 0.5614,
+     "spell_f1_mean": 0.6131,
+     "team_acc_gt_alive": 0.8998,
+     "trans_precision_12": 0.6837,
+     "trans_precision_25": 0.75,
+     "trans_recall_12": 0.469,
+     "trans_recall_25": 0.5145
+    },
+    "rule": {
+     "alive_dead_f1": 0.9369,
+     "fragmentation": 0.5773,
+     "macro_f1": 0.8006,
+     "n_gt_spells": 382,
+     "n_pred_spells": 208,
+     "spell_bootstrap_high": 0.4203,
+     "spell_bootstrap_low": 0.3308,
+     "spell_f1_mean": 0.3729,
+     "team_acc_gt_alive": 0.7788,
+     "trans_precision_12": 0.3333,
+     "trans_precision_25": 0.4194,
+     "trans_recall_12": 0.1921,
+     "trans_recall_25": 0.2417
+    },
+    "rule_oracle_mask": {
+     "alive_dead_f1": 1.0,
+     "fragmentation": 0.6866,
+     "macro_f1": 0.8937,
+     "n_gt_spells": 382,
+     "n_pred_spells": 230,
+     "spell_bootstrap_high": 0.5634,
+     "spell_bootstrap_low": 0.4647,
+     "spell_f1_mean": 0.5144,
+     "team_acc_gt_alive": 0.8415,
+     "trans_precision_12": 0.7018,
+     "trans_precision_25": 0.7289,
+     "trans_recall_12": 0.4814,
+     "trans_recall_25": 0.5
+    }
+   }
+  }
+ },
+ "held_out_by": "half",
+ "notes": [
+  "The H/A evidence weights in ha_model.json and the dead-ball player model (Sample Games 1-3) were fitted on this game; the 'model' and 'rule' rows hold the H/A part out by half, the dead-ball labeller is in-sample."
+ ],
+ "reference_games": [
+  3
+ ],
+ "rule_k_to_ship": 12,
+ "shipped_model": {
+  "beta": 50.0,
+  "lambda": 5.0,
+  "min_seg_s": 2.0
+ }
+}

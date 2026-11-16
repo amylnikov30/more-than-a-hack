@@ -155,6 +155,21 @@ decided not to add Games 1–2, although `reference.py` can load them. On each f
 The live mask is the event-derived one, so these numbers measure H/A alone. The whole chain,
 with the dead-ball labeller's own errors, is measured by `src/pipeline/evaluate_chain.py`.
 
+**Whole chain (16 Nov, `make evaluate`).** On degraded Sample Game 3 the dead-ball labeller runs on
+the degraded tracking, and H/A runs on its live spells, held out by half. The 90% intervals come
+from 1000 bootstrap draws.
+
+| System | spellF1 | 90% interval |
+|---|---|---|
+| This model | 0.491 | 0.448–0.540 |
+| Step-6 rule (`pipeline/rule.py`, K = 12 frames) | 0.373 | 0.331–0.420 |
+| `baseline_smooth50` | 0.255 | 0.232–0.278 |
+| This model, event-derived live mask | 0.613 | 0.561–0.663 |
+
+The model's interval lies above the rule's, so the model ships (`pipeline/config.py`, `SHIP`).
+Dead-ball errors cost about 0.12. The labeller finds 72 of 103 stoppages, and the stoppages it
+misses merge possessions.
+
 | Held-out half | spellF1, snapping off | spellF1, snapping on |
 |---|---|---|
 | Half 1 | 0.641 | 0.645 |
