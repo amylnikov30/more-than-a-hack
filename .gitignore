@@ -226,3 +226,5 @@ __marimo__/
 data/
 
 eda/deadball_matching/.deadball_matching
+# IDE settings (machine-specific)
+.idea/
