@@ -1,7 +1,7 @@
 # Frame-level ball possession from tracking alone
 
-**Team:** TEAM_NAME · More than a Hack 2027, Phase 1 · FC Barcelona v Athletic Club
-**Code:** https://github.com/amylnikov30/more-than-a-hack · **File:** `TEAM_NAME.csv` (sha256 `ad3a319c4dcd38d4eb4a09c198bceb79b69b2e31a8ac4bce6a2efb6796b02e8a`)
+**Team:** Yamalation · More than a Hack 2027, Phase 1 · FC Barcelona v Athletic Club
+**Code:** https://github.com/amylnikov30/more-than-a-hack · **File:** `Yamalation.csv` (sha256 `ad3a319c4dcd38d4eb4a09c198bceb79b69b2e31a8ac4bce6a2efb6796b02e8a`)
 
 ## 1. Approach
 
@@ -182,13 +182,13 @@ numbers at run time; the committed model files (`src/deadball/player_model.json`
 pip install -r requirements.txt
 export MTAH_DATA_DIR=/path/to/data            # the organisers' bundle, tactical/ folder inside
 export MTAH_PUBLIC_REPO=/path/to/more-than-a-hack-2027   # for validate_submission.py
-make run TEAM=TEAM_NAME                        # writes ~/mtah_out/submission/TEAM_NAME.csv
+make run TEAM=Yamalation                        # writes ~/mtah_out/submission/Yamalation.csv
 ```
 
 Without `make`, the same run is:
 
 ```bash
-PYTHONPATH="$PWD:$PWD/src" python3 -m pipeline.make_submission ~/mtah_out/submission --team TEAM_NAME
+PYTHONPATH="$PWD:$PWD/src" python3 -m pipeline.make_submission ~/mtah_out/submission --team Yamalation
 ```
 
 Under a minute for the dead-ball stage and a few minutes for the whole file. To retrain from
