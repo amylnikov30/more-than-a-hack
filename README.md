@@ -62,7 +62,13 @@ export MTAH_DATA_DIR=/path/to/data MTAH_PUBLIC_REPO=~/more-than-a-hack-2027
 make run TEAM=<team_name> PY=~/mtah-venv/bin/python
 ```
 
-This is `python -m pipeline.make_submission ~/mtah_out/submission --team <team_name>`. It:
+Without `make` (the VM has none), run the same thing directly from the repository root:
+
+```bash
+PYTHONPATH="$PWD:$PWD/src" ~/mtah-venv/bin/python -m pipeline.make_submission ~/mtah_out/submission --team <team_name>
+```
+
+It:
 
 1. runs the dead-ball labeller and writes `dead_ball.csv`;
 2. runs the H/A system named in `src/pipeline/config.py` (`SHIP`): the model
